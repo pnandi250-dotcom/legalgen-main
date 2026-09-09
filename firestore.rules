@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // "documents" collection — generated legal docs saved by users
+    match /documents/{docId} {
+      // Anyone signed in can create a doc, but only as themselves
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+
+      // Only the owner can read, update, or delete their own doc
+      allow read, update, delete: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+    }
+
+    // "generations" collection — analytics log from trackGeneration()
+    match /generations/{genId} {
+      allow create: if request.auth != null || true; // allow anonymous tracking too
+      allow read, update, delete: if false; // nobody reads this from the client
+    }
+
+    // "domainVerifications" collection — from the ownership-verification flow
+    match /domainVerifications/{verId} {
+      allow read: if request.auth != null
+                    && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.verified == false; // client can only create unverified
+      allow update: if false; // 🔒 marking verified=true must happen server-side (Cloud Function), not from the client
+    }
+
+    // Deny everything else by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
