@@ -1026,7 +1026,7 @@ export default function LegalGenPage() {
     
     // 🔒 DOMAIN VERIFICATION REQUIRED (NEW!)
     const domain = extractDomain(complianceUrl);
-    if (domain && !isDomainVerifiedForUser(domain, user.email)) {
+    if (domain && user.email && !isDomainVerifiedForUser(domain, user.email)) {
       setComplianceError(`⚠️ Security: You must verify ownership of "${domain}" before running an audit. Domain verification is required to protect website owners.`);
       return;
     }
@@ -1107,7 +1107,7 @@ export default function LegalGenPage() {
 
   const handleRunAuditWithUrl = useCallback((inputUrl: string) => {
     // 🔒 SECURITY CHECK: Verify domain before running audit
-    if (user) {
+    if (user?.email) {
       const domain = extractDomain(inputUrl);
       if (domain && !isDomainVerifiedForUser(domain, user.email)) {
         // Not verified! Don't run audit, show verification instead
