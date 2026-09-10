@@ -1097,71 +1097,12 @@ export default function LegalGenPage() {
     setFromCompliance(false);
   }, []);
 
-  // ═══════════════════════════════════════════
-  // RATE LIMITING SYSTEM - NEW
-  // ═══════════════════════════════════════════
-  
-  // Rate limiting: Track audits per user per day (max 5 for free users)
-  const getAuditsToday = useCallback(() => {
-    const today = new Date().toDateString();
-    const stored = localStorage.getItem('legalgen_audit_count');
-    if (stored) {
-      const data = JSON.parse(stored);
-      if (data.date === today) {
-        return data.count;
-      }
-    }
-    return 0;
-  }, []);
-
-  const incrementAuditCount = useCallback(() => {
-    const today = new Date().toDateString();
-    const stored = localStorage.getItem('legalgen_audit_count');
-    let count = 1;
-    if (stored) {
-      const data = JSON.parse(stored);
-      if (data.date === today) {
-        count = data.count + 1;
-      }
-    }
-    localStorage.setItem('legalgen_audit_count', JSON.stringify({ date: today, count }));
-    return count;
-  }, []);
-
-  const MAX_FREE_AUDITS_PER_DAY = 5;
-
-  const handleRunAuditWithUrl = useCallback((inputUrl: string, companyName?: string, userRole?: string) => {
-    
-    // 🔒 SECURITY CHECK #1: Require authentication
-    if (!user) {
-      setComplianceError('Please sign in to run a compliance audit.');
-      setView("compliance");
-      setComplianceUrl(inputUrl);
-      return;
-    }
-
-    // 🔒 SECURITY CHECK #2: Rate limiting
-    const auditsToday = getAuditsToday();
-    if (auditsToday >= MAX_FREE_AUDITS_PER_DAY) {
-      setComplianceError(`Daily limit reached (${MAX_FREE_AUDITS_PER_DAY} audits/day). Please try again tomorrow or upgrade for unlimited audits.`);
-      setView("compliance");
-      setComplianceUrl(inputUrl);
-      return;
-    }
-
-    // Increment audit count
-    incrementAuditCount();
-
+  const handleRunAuditWithUrl = useCallback((inputUrl: string) => {
     setComplianceResult(null);
     setComplianceError('');
     setComplianceUrl(inputUrl);
     setView("compliance");
     setFromCompliance(false);
-
-    // Store company info for tracking (optional)
-    if (companyName || userRole) {
-      console.log('Audit initiated by:', { companyName, userRole, userId: user.uid });
-    }
 
     // Trigger the check automatically
     setTimeout(() => {
@@ -1222,13 +1163,12 @@ export default function LegalGenPage() {
               results
             });
 
-            // 📊 Track audit in Firebase with enhanced data
+          // 📊 Track audit in Firebase
             trackAudit({
               url: fixedUrl,
               score,
               userId: user?.uid || null,
-              companyName: companyName || null,   // ← NEW
-              userRole: userRole || null,        // ← NEW
+              // REMOVED: companyName & userRole
             });
           }
         })
@@ -1239,7 +1179,7 @@ export default function LegalGenPage() {
           setIsChecking(false);
         });
     }, 100);
-  }, [user, getAuditsToday, incrementAuditCount]);
+  }, []);
 
   const currentConfig = DOC_CONFIGS.find(d => d.type === selectedDoc);
 
@@ -1353,8 +1293,8 @@ export default function LegalGenPage() {
             <HomeView onSelectDoc={handleSelectDoc}
               onOpenCompliance={handleOpenCompliance}
               onRunAudit={handleRunAuditWithUrl}
-              user={user}                    // ← NEW
-              signInWithGoogle={signInWithGoogle}  // ← NEW
+              user={user}
+              signInWithGoogle={signInWithGoogle}
             />
           )}
           {view === "compliance" && (
@@ -2234,24 +2174,53 @@ function ComplianceCheckerView({
 /* ═══════════════════════════════════════════
    HOME VIEW
    ═══════════════════════════════════════════ */
+// Rate limiting constants
+const MAX_FREE_AUDITS_PER_DAY = 5;
+const AUDIT_STORAGE_KEY = 'legalgen_audit_count';
+
+// Helper function to get today's audit count from localStorage
+function getAuditsToday(): number {
+  if (typeof window === 'undefined') return 0;
+  const stored = localStorage.getItem(AUDIT_STORAGE_KEY);
+  if (!stored) return 0;
+  try {
+    const data = JSON.parse(stored);
+    const today = new Date().toDateString();
+    if (data.date === today) {
+      return data.count || 0;
+    }
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Helper function to increment audit count in localStorage
+function incrementAuditCount(): void {
+  if (typeof window === 'undefined') return;
+  const today = new Date().toDateString();
+  const current = getAuditsToday();
+  localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify({ date: today, count: current + 1 }));
+}
+
 function HomeView({
   onSelectDoc,
   onOpenCompliance,
   onRunAudit,
-  user,                    // ← NEW
-  signInWithGoogle         // ← NEW
+  user,
+  signInWithGoogle
 }: {
   onSelectDoc: (type: DocumentType) => void;
   onOpenCompliance: () => void;
-  onRunAudit: (url: string, companyName?: string, userRole?: string) => void;
-  user: any;               // ← NEW
-  signInWithGoogle: () => Promise<any>;  // ✅ FIXED: Changed to 'any'
+  onRunAudit: (url: string) => void;
+  user: any;
+  signInWithGoogle: () => Promise<any>;
 }) {
   const [siteUrl, setSiteUrl] = useState("");
-  const [companyName, setCompanyName] = useState("");    // ← NEW
-  const [userRole, setUserRole] = useState("");          // ← NEW
   const [selectedBiz, setSelectedBiz] = useState<string | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);  // ← NEW
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+
   const filteredDocs = useMemo(() => {
     if (!selectedBiz) return DOC_CONFIGS;
     const biz = BUSINESS_CATEGORIES[selectedBiz];
@@ -2259,26 +2228,50 @@ function HomeView({
     return DOC_CONFIGS.filter(d => biz.docs.includes(d.type));
   }, [selectedBiz]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // 🔒 SECURITY CHECK: Require authentication before running audit
-    if (!user) {
-      setShowAuthModal(true);  // ← Show login modal
-      return;                  // ← Stop here!
-    }
-    
-    if (siteUrl.trim()) {
-      onRunAudit(siteUrl, companyName, userRole);  // ← Now passes company/role
-    } else {
-      onOpenCompliance();
+  const handleLoginAndContinue = async () => {
+    try {
+      await signInWithGoogle();
+      setShowAuthModal(false);
+      // After login, retry the audit
+      if (siteUrl.trim()) {
+        const auditsToday = getAuditsToday();
+        if (auditsToday >= MAX_FREE_AUDITS_PER_DAY) {
+          setRateLimitError(`Daily limit reached (${MAX_FREE_AUDITS_PER_DAY} free audits/day). Sign in for unlimited audits.`);
+          return;
+        }
+        incrementAuditCount();
+        onRunAudit(siteUrl);
+      }
+    } catch (error) {
+      console.error('Sign in failed:', error);
     }
   };
 
-  // 🔒 NEW: Handle Google sign-in from modal
-  const handleLoginAndContinue = async () => {
-    await signInWithGoogle();
-    setShowAuthModal(false);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRateLimitError(null);
+    
+    if (siteUrl.trim()) {
+      // Check authentication requirement
+      if (!user) {
+        // Check rate limit for non-authenticated users
+        const auditsToday = getAuditsToday();
+        if (auditsToday >= MAX_FREE_AUDITS_PER_DAY) {
+          setRateLimitError(`Daily limit reached (${MAX_FREE_AUDITS_PER_DAY} free audits/day). Sign in for unlimited audits.`);
+          setShowAuthModal(true);
+          return;
+        }
+        // Show auth modal for first-time users or continue with rate limited access
+        setShowAuthModal(true);
+        return;
+      }
+      
+      // User is authenticated, proceed with audit
+      incrementAuditCount();
+      onRunAudit(siteUrl);
+    } else {
+      onOpenCompliance();
+    }
   };
 
   return (
@@ -2586,20 +2579,6 @@ function HomeView({
           </div>
 
           <div className="bg-[#FAFAF9] dark:bg-slate-900 p-8 sm:p-12 lg:p-16 flex flex-col justify-center">
-            
-            {/* 🔒 NEW: Authentication Required Warning */}
-            {!user && (
-              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-                <div className="flex items-start gap-3">
-                  <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Authentication Required</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Please sign in to run a compliance audit. This helps us protect against abuse.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
             <form className="space-y-8 sm:space-y-10" onSubmit={handleSubmit}>
               <div>
                 <label className="text-[#9A3412] dark:text-orange-500 text-[10px] sm:text-xs uppercase tracking-widest font-bold mb-1 block">
@@ -2614,84 +2593,80 @@ function HomeView({
                   className="w-full bg-transparent border-b-2 border-[#9A3412]/30 py-2 text-lg sm:text-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#C2410C] transition-colors placeholder:text-[#9A3412]/40"
                 />
               </div>
-              
-              {/* 🔧 FIXED: Company Name Field */}
-              <div>
-                <label className="text-[#9A3412] dark:text-orange-500 text-[10px] sm:text-xs uppercase tracking-widest font-bold mb-1 block">Company Name</label>
-                <input
-                  type="text"
-                  value={companyName}                    // ← ADDED
-                  onChange={(e) => setCompanyName(e.target.value)}  // ← ADDED
-                  placeholder="Your company name"         // ← ADDED
-                  className="w-full bg-transparent border-b-2 border-[#9A3412]/30 py-2 text-lg sm:text-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#C2410C] transition-colors placeholder:text-[#9A3412]/40"
-                />
-              </div>
-              
-              {/* 🔧 FIXED: Your Role Field */}
-              <div>
-                <label className="text-[#9A3412] dark:text-orange-500 text-[10px] sm:text-xs uppercase tracking-widest font-bold mb-1 block">Your Role</label>
-                <input
-                  type="text"
-                  value={userRole}                      // ← ADDED
-                  onChange={(e) => setUserRole(e.target.value)}    // ← ADDED
-                  placeholder="e.g. Founder, Developer"
-                  className="w-full bg-transparent border-b-2 border-[#9A3412]/30 py-2 text-lg sm:text-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#C2410C] transition-colors placeholder:text-[#9A3412]/40"
-                />
-              </div>
-              
-              {/* 🔒 UPDATED: Smart Button */}
               <button
                 type="submit"
-                className={`w-full font-semibold uppercase tracking-[0.15em] text-xs sm:text-sm py-4 sm:py-5 rounded-full transition-all duration-300 mt-2 sm:mt-4 hover:-translate-y-0.5 active:translate-y-0 ${
-                  user 
-                    ? 'bg-[#C2410C] hover:bg-[#9A3412] text-white' 
-                    : 'bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                }`}
-                style={user ? { boxShadow: "0 8px 25px -5px rgba(194, 65, 12, 0.35), 0 4px 10px -3px rgba(194, 65, 12, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)" } : {}}
+                className="w-full bg-[#C2410C] hover:bg-[#9A3412] text-white font-semibold uppercase tracking-[0.15em] text-xs sm:text-sm py-4 sm:py-5 rounded-full transition-all duration-300 mt-2 sm:mt-4 hover:-translate-y-0.5 active:translate-y-0"
+                style={{ boxShadow: "0 8px 25px -5px rgba(194, 65, 12, 0.35), 0 4px 10px -3px rgba(194, 65, 12, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)" }}
               >
-                {user ? 'Run Compliance Audit' : 'Sign in to Run Audit'}
+                Run Compliance Audit
               </button>
-              
-              {/* 🔒 UPDATED: Helper Text */}
               <p className="text-center text-[9px] sm:text-[10px] text-[#9A3412]/60 dark:text-slate-500 uppercase tracking-widest font-bold">
-                {user ? 'Audits are tracked and limited to 5 per day.' : 'Sign in required to access compliance audit tool.'}
+                Your data is strictly processed client-side.
               </p>
             </form>
           </div>
         </div>
       </section>
 
-      {/* 🔒 NEW: Authentication Modal */}
+      {/* AUTHENTICATION MODAL */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#C2410C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ShieldCheck className="w-8 h-8 text-[#C2410C]" />
-              </div>
-              <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">Sign In Required</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-sm mb-6">
-                To protect against abuse and provide personalized results, please sign in with your Google account before running a compliance audit.
-              </p>
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={handleLoginAndContinue}
-                  className="w-full bg-[#C2410C] hover:bg-[#9A3412] text-white font-semibold py-3 px-6 rounded-full transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                  Sign in with Google
-                </button>
-                <button
-                  onClick={() => setShowAuthModal(false)}
-                  className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium py-3 px-6 rounded-full transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
-                🔒 Your data is secure and never shared.
-              </p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowAuthModal(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-200 dark:border-slate-700">
+            {/* Icon */}
+            <div className="w-16 h-16 mx-auto mb-6 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+              <ShieldCheck className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
             </div>
+            
+            {/* Title */}
+            <h3 className="text-2xl font-semibold text-slate-900 dark:text-white text-center mb-3">
+              Sign In Required
+            </h3>
+            
+            {/* Explanation */}
+            <p className="text-sm text-slate-600 dark:text-slate-400 text-center mb-6 leading-relaxed">
+              {rateLimitError ? (
+                <span className="text-amber-600 dark:text-amber-400">{rateLimitError}</span>
+              ) : (
+                <>Sign in to run compliance audits and access all features. Your audit history will be saved securely to your account.</>
+              )}
+            </p>
+            
+            {/* Buttons */}
+            <div className="space-y-3">
+              <button
+                onClick={handleLoginAndContinue}
+                className="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-medium py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-600 transition-colors"
+              >
+                {/* Google SVG Icon */}
+                <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+                  <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9.003 18z" fill="#34A853"/>
+                  <path d="M3.964 10.712c-.18-.54-.282-1.117-.282-1.712s.102-1.172.282-1.712V5.011H.957C.347 6.229 0 7.61 0 9s.348 2.771.957 3.989l3.007-2.277z" fill="#FBBC05"/>
+                  <path d="M9.003 3.46c1.317 0 2.5.454 3.435 1.345l2.573-2.573C13.463.891 11.426 0 9.003 0 5.482 0 2.438 2.017.957 5.01L3.964 7.27c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335"/>
+                </svg>
+                Sign in with Google
+              </button>
+              
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="w-full py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            
+            {/* Security Note */}
+            <p className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-500 text-center flex items-center justify-center gap-1.5">
+              <Lock className="w-3 h-3" />
+              Secure authentication via Google OAuth
+            </p>
           </div>
         </div>
       )}
