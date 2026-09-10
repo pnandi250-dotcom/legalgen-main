@@ -59,19 +59,24 @@ export async function trackGeneration(data: {
 
 /**
  * Track compliance audit runs
+ * 🔒 UPDATED: Now includes companyName and userRole for better tracking
  */
 export async function trackAudit(data: {
     url: string;
     score: number | null;
     userId: string | null;
+    companyName?: string | null;  // ← NEW
+    userRole?: string | null;     // ← NEW
 }) {
-    const { url, score, userId } = data;
+    const { url, score, userId, companyName, userRole } = data;
 
     if (analytics) {
         logEvent(analytics, "compliance_audit", {
             target_url: url,
             score,
             user_id: userId || "anonymous",
+            company_name: companyName || "not_provided",  // ← NEW
+            user_role: userRole || "not_provided",         // ← NEW
         });
     }
 
@@ -80,6 +85,8 @@ export async function trackAudit(data: {
             url,
             score,
             userId: userId || null,
+            companyName: companyName || null,  // ← NEW
+            userRole: userRole || null,       // ← NEW
             createdAt: serverTimestamp(),
         });
     } catch (err) {
