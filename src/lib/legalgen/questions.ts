@@ -3,6 +3,7 @@ import type { DocumentType, QuestionGroup } from './types';
 
 export function getQuestions(type: DocumentType): QuestionGroup[] {
   switch (type) {
+    
     // ─── EXISTING CORE POLICIES ───────────────────────────────────────────
     case 'privacy-policy':
       return [
@@ -96,8 +97,8 @@ export function getQuestions(type: DocumentType): QuestionGroup[] {
           ]
         }
       ];
-
-    case 'terms-of-service':
+ 
+      case 'terms-of-service':
       return [
         {
           id: 'group_tos_basics',

@@ -1,4 +1,5 @@
 "use client";
+import html2pdf from 'html2pdf.js';
 import { Code2 } from "lucide-react";
 import { saveDocumentToDb } from "@/lib/firebase/firestore";
 import { trackGeneration, trackAudit } from "@/lib/firebase/analytics";
@@ -12,7 +13,7 @@ import {
   Lock, ShieldCheck, Star, Quote, Users, FileCheck, Award,
   ChevronDown, Calendar, Heart, MessageCircle, BadgeCheck,
   ArrowUpRight, Sparkles, Fingerprint, Server, Cpu, Gavel, HelpCircle,
-  Ban, Handshake, ScrollText, AlertOctagon, Megaphone, FileBadge, Database, FileX, Gauge, ShieldAlert, TrendingUp, Phone, Hotel, ShoppingBag, UtensilsCrossed, Stethoscope, GraduationCap, Landmark, Store, Briefcase, Smartphone, Film, Building,
+  Ban, Handshake, ScrollText, AlertOctagon, Megaphone, FileBadge, Database, FileX, Gauge, ShieldAlert,Info, TrendingUp, Phone, Hotel, ShoppingBag, UtensilsCrossed, Stethoscope, GraduationCap, Landmark, Store, Briefcase, Smartphone, Film, Building,
   Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -512,26 +513,39 @@ const BUSINESS_CATEGORIES: Record<string, {
     desc: "Any other business or startup"
   },
 };
+function generateDocument(type: DocumentType, data: FormData, jurisdiction: 'IN' | 'GLOBAL') {
+  // 1. Create a container for the original document object
+  let doc: { html: string; text: string; title: string } = { html: "", text: "", title: "" };
 
-/* ─── GENERATE FUNCTION ─── */
-function generateDocument(type: DocumentType, data: FormData) {
+  // 2. Get the original document based on the type
   switch (type) {
-    case "privacy-policy": return generatePrivacyPolicy(data);
-    case "terms-of-service": return generateTermsOfService(data);
-    case "refund-policy": return generateRefundPolicy(data);
-    case "cookie-policy": return generateCookiePolicy(data);
-    case "disclaimer": return generateDisclaimer(data);
-    case "shipping-policy": return generateShippingPolicy(data);
-    case "cancellation-policy": return generateCancellationPolicy(data);
-    case "return-policy": return generateReturnPolicy(data);
-    case "service-level-agreement": return generateServiceLevelAgreement(data);
-    case "community-guidelines": return generateCommunityGuidelines(data);
-    case "gdpr-compliance": return generateGDPRCompliance(data);
-    case "data-processing-agreement": return generateDataProcessingAgreement(data);
-    case "dmca-policy": return generateDmcaPolicy(data);
-    case "content-moderation-policy": return generateContentModerationPolicy(data);
-    case "acceptable-use-policy": return generateAup(data);
+    case "privacy-policy": doc = generatePrivacyPolicy(data); break;
+    case "terms-of-service": doc = generateTermsOfService(data); break;
+    case "refund-policy": doc = generateRefundPolicy(data); break;
+    case "cookie-policy": doc = generateCookiePolicy(data); break;
+    case "disclaimer": doc = generateDisclaimer(data); break;
+    case "shipping-policy": doc = generateShippingPolicy(data); break;
+    case "cancellation-policy": doc = generateCancellationPolicy(data); break;
+    case "return-policy": doc = generateReturnPolicy(data); break;
+    case "service-level-agreement": doc = generateServiceLevelAgreement(data); break;
+    case "community-guidelines": doc = generateCommunityGuidelines(data); break;
+    case "gdpr-compliance": doc = generateGDPRCompliance(data); break;
+    case "data-processing-agreement": doc = generateDataProcessingAgreement(data); break;
+    case "dmca-policy": doc = generateDmcaPolicy(data); break;
+    case "content-moderation-policy": doc = generateContentModerationPolicy(data); break;
+    case "acceptable-use-policy": doc = generateAup(data); break;
   }
+
+  // 3. Generate the FOOTER HTML
+     // Uses the user's selected jurisdiction from the UI
+   const selectedJurisdiction = jurisdiction;
+  const isProUser = false;   // Change to true later for paid users
+     const footerHtml = generateFooterHTML(jurisdiction, type, isProUser);
+
+  // 4. Append the footer ONLY to the HTML part, and return the full object
+  doc.html = doc.html + footerHtml;
+  
+  return doc;
 }
 /* ─── QUESTION FIELD ─── */
 function QuestionField({
@@ -689,7 +703,7 @@ function QuestionField({
    ═══════════════════════════════════════════ */
 function QuestionnaireView({
   groups, step, formData, updateField, onNext, onBack, isLastStep, currentConfig, isGenerating, progress,
-  fromCompliance,
+  fromCompliance, jurisdiction,
 }: {
   groups: QuestionGroup[];
   step: number;
@@ -702,6 +716,7 @@ function QuestionnaireView({
   isGenerating: boolean;
   progress: number;
   fromCompliance?: boolean;
+  jurisdiction?: 'IN' | 'GLOBAL';
 }) {
   const currentGroup = groups[step];
   const [showWarning, setShowWarning] = useState<string | null>(null);
@@ -798,6 +813,100 @@ function QuestionnaireView({
               }}
             />
           ))}
+  {/* Grievance Officer Section - IT Rules 2021 Compliance */}
+{jurisdiction === 'IN' && (
+  <div className="mt-6 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50/80 to-orange-50/60 dark:from-amber-950/20 dark:to-orange-950/10 dark:border-amber-900/30 overflow-hidden">
+    {/* Header */}
+    <div className="flex items-start gap-3 px-5 py-4 bg-amber-100/50 dark:bg-amber-900/20 border-b border-amber-200/50 dark:border-amber-800/30">
+      <div className="mt-0.5 w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+        <ShieldAlert className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-200 tracking-tight">
+          Grievance Officer Details
+        </h4>
+        <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5 leading-relaxed">
+          Required under <span className="font-medium">IT Rules 2021 (Rule 4)</span> & <span className="font-medium">DPDP Act 2023</span> for businesses operating in India.
+        </p>
+      </div>
+      <Badge variant="outline" className="shrink-0 text-[10px] font-semibold uppercase tracking-wider border-amber-300/50 text-amber-700 dark:text-amber-400 dark:border-amber-700/30 bg-amber-100/50 dark:bg-amber-900/20 px-2 py-0.5">
+        Mandatory
+      </Badge>
+    </div>
+
+    {/* Form Fields */}
+    <div className="p-5 space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Full Name */}
+        <div className="space-y-1.5">
+          <Label htmlFor="go_name" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+            Full Name <span className="text-amber-600">*</span>
+          </Label>
+          <Input
+            id="go_name"
+            placeholder="e.g., Rajesh Kumar"
+            value={(formData['go_name'] as string) || ''}
+            onChange={(e) => updateField('go_name', e.target.value)}
+            className="h-9 text-sm bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-amber-400 focus:ring-amber-400/20"
+          />
+        </div>
+
+        {/* Email */}
+        <div className="space-y-1.5">
+          <Label htmlFor="go_email" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+            Official Email <span className="text-amber-600">*</span>
+          </Label>
+          <Input
+            id="go_email"
+            type="email"
+            placeholder="grievance@company.com"
+            value={(formData['go_email'] as string) || ''}
+            onChange={(e) => updateField('go_email', e.target.value)}
+            className="h-9 text-sm bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-amber-400 focus:ring-amber-400/20"
+          />
+        </div>
+
+        {/* Phone */}
+        <div className="space-y-1.5">
+          <Label htmlFor="go_phone" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+            Contact Number <span className="text-amber-600">*</span>
+          </Label>
+          <Input
+            id="go_phone"
+            type="tel"
+            placeholder="+91 98765 43210"
+            value={(formData['go_phone'] as string) || ''}
+            onChange={(e) => updateField('go_phone', e.target.value)}
+            className="h-9 text-sm bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-amber-400 focus:ring-amber-400/20"
+          />
+        </div>
+
+        {/* Address - Full Width */}
+        <div className="space-y-1.5 md:col-span-2">
+          <Label htmlFor="go_address" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+            Office Address for Legal Notices <span className="text-amber-600">*</span>
+          </Label>
+          <Textarea
+            id="go_address"
+            placeholder="Complete postal address where legal notices can be served..."
+            value={(formData['go_address'] as string) || ''}
+            onChange={(e) => updateField('go_address', e.target.value)}
+            rows={3}
+            className="text-sm bg-white/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-amber-400 focus:ring-amber-400/20 resize-none"
+          />
+        </div>
+      </div>
+
+      {/* Info Note */}
+      <div className="flex items-start gap-2 pt-2 border-t border-amber-200/40 dark:border-amber-800/30">
+        <Info className="w-3.5 h-3.5 text-amber-600/70 dark:text-amber-400/70 mt-0.5 shrink-0" />
+        <p className="text-[11px] text-amber-700/70 dark:text-amber-400/70 leading-relaxed">
+          This information will be published in your Privacy Policy. Users will contact this person for any data-related grievances.
+        </p>
+      </div>
+    </div>
+  </div>
+)}
 
           {showWarning && currentGroup.questions.find(q => q.id === showWarning)?.warning && (
             <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/50 dark:border-amber-900/50">
@@ -809,7 +918,6 @@ function QuestionnaireView({
           )}
         </CardContent>
       </Card>
-
       {/* Navigation */}
       <div className="flex items-center justify-between mt-6">
         <Button
@@ -865,6 +973,7 @@ export default function LegalGenPage() {
   const [formData, setFormData] = useState<FormData>({});
   const [step, setStep] = useState(0);
   const [generatedDoc, setGeneratedDoc] = useState<{ html: string; text: string; title: string } | null>(null);
+     const [jurisdiction, setJurisdiction] = useState<'IN' | 'GLOBAL'>('IN');
   const [copiedHtml, setCopiedHtml] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -934,7 +1043,7 @@ export default function LegalGenPage() {
     } else {
       setIsGenerating(true);
       if (selectedDoc) {
-        const doc = generateDocument(selectedDoc, formData);
+        const doc = generateDocument(selectedDoc, formData, jurisdiction);
         setGeneratedDoc(doc ?? null);
 
         // 📊 Track this generation in Firebase
@@ -982,6 +1091,23 @@ export default function LegalGenPage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [generatedDoc]);
+
+  const handleDownloadPdf = useCallback(() => {
+  if (!generatedDoc) return;
+  const element = document.getElementById('pdf-content');
+  if (element) {
+    html2pdf()
+      .from(element)
+      .set({
+        margin: 10,
+        filename: `${generatedDoc.title.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      })
+      .save();
+  }
+}, [generatedDoc]);
 
   const handleDownloadTxt = useCallback(() => {
     if (!generatedDoc) return;
@@ -1312,14 +1438,17 @@ export default function LegalGenPage() {
 
         {/* MAIN */}
         <main className="flex-1">
-          {view === "home" && (
-            <HomeView onSelectDoc={handleSelectDoc}
-              onOpenCompliance={handleOpenCompliance}
-              onRunAudit={handleRunAuditWithUrl}
-              user={user}
-              signInWithGoogle={signInWithGoogle}
-            />
-          )}
+{view === "home" && (
+  <HomeView
+    onSelectDoc={handleSelectDoc}
+    onOpenCompliance={handleOpenCompliance}
+    onRunAudit={handleRunAuditWithUrl}
+    user={user}
+    signInWithGoogle={signInWithGoogle}
+    jurisdiction={jurisdiction}
+    setJurisdiction={setJurisdiction}
+  />
+)}
           {view === "compliance" && (
             <ComplianceCheckerView
               url={complianceUrl}
@@ -1332,25 +1461,28 @@ export default function LegalGenPage() {
               onGenerateDoc={handleSelectDoc}
               detectedAnalysis={detectedAnalysis}
             />
-          )}          {view === "questionnaire" && selectedDoc && (
-            <QuestionnaireView
-              key={selectedDoc}
-              groups={questions}
-              step={step}
-              formData={formData}
-              updateField={updateField}
-              onNext={handleNext}
-              onBack={handleBack}
-              isLastStep={step === totalSteps - 1}
-              currentConfig={currentConfig}
-              isGenerating={isGenerating}
-              progress={(step + 1) / totalSteps * 100}
-              fromCompliance={fromCompliance}
-            />
-          )}
+          )}          
+          {view === "questionnaire" && selectedDoc && (
+  <QuestionnaireView
+    key={selectedDoc}
+    groups={questions}
+    step={step}
+    formData={formData}
+    updateField={updateField}
+    onNext={handleNext}
+    onBack={handleBack}
+    isLastStep={step === totalSteps - 1}
+    currentConfig={currentConfig}
+    isGenerating={isGenerating}
+    progress={(step + 1) / totalSteps * 100}
+    fromCompliance={fromCompliance}
+    jurisdiction={jurisdiction}
+  />
+)}
           {view === "preview" && generatedDoc && (
             <PreviewView
               ref={previewRef}
+              onDownloadPdf={handleDownloadPdf}
               doc={generatedDoc}
               copiedHtml={copiedHtml}
               copiedText={copiedText}
@@ -1494,11 +1626,12 @@ const PreviewView = forwardRef<HTMLDivElement, {
   onCopyText: () => void;
   onDownloadHtml: () => void;
   onDownloadTxt: () => void;
+  onDownloadPdf: () => void;
   currentConfig: { title: string; color: string; bgColor: string; icon: React.ReactNode } | undefined;
   fromCompliance?: boolean;
   onBackToResults?: () => void;
 }>(({
-  doc, copiedHtml, copiedText, onCopyHtml, onCopyText, onDownloadHtml, onDownloadTxt, currentConfig, fromCompliance, onBackToResults
+doc, copiedHtml, copiedText, onCopyHtml, onCopyText, onDownloadHtml, onDownloadTxt, onDownloadPdf, currentConfig, fromCompliance, onBackToResults
 }, ref) => {
   const { user, signInWithGoogle } = useAuth(); // <-- ADDED AUTH
   const [tab, setTab] = useState<"preview" | "html">("preview");
@@ -1597,13 +1730,16 @@ const PreviewView = forwardRef<HTMLDivElement, {
 
               <div className="bg-white dark:bg-slate-900 max-h-[70vh] overflow-y-auto">
                 {tab === "preview" ? (
-                  <iframe
-                    srcDoc={doc.html.replace('<head>', '<head><base target="_blank" rel="noopener noreferrer">')}
-                    title={doc.title}
-                    className="w-full min-h-[600px] border-0 bg-white"
-                    sandbox="allow-same-origin allow-popups"
-                  />
-                ) : (
+<>
+  <div id="pdf-content" style={{ display: 'none' }} dangerouslySetInnerHTML={{ __html: doc.html }} />
+  <iframe
+    srcDoc={doc.html.replace('<head>', '<head><base target="_blank" rel="noopener noreferrer">')}
+    title={doc.title}
+    className="w-full min-h-[600px] border-0 bg-white"
+    sandbox="allow-same-origin allow-popups"
+  />
+</>
+) : (
                   <pre className="p-5 text-xs text-slate-600 dark:text-slate-400 overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap break-all">
                     {doc.html}
                   </pre>
@@ -1723,13 +1859,12 @@ const PreviewView = forwardRef<HTMLDivElement, {
                   Download .html
                 </Button>
                 <Button
-                  onClick={onDownloadTxt}
-                  className="w-full justify-start rounded-xl dark:border-slate-700 dark:text-slate-300"
-                  variant="outline"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download .txt
-                </Button>
+  onClick={onDownloadPdf}
+  className="w-full justify-start rounded-xl bg-gradient-to-r from-red-500 to-pink-500 hover:opacity-90 text-white border-0"
+>
+  <Download className="w-4 h-4 mr-2" />
+  Download PDF
+</Button>
               </CardContent>
             </Card>
 
@@ -2295,28 +2430,32 @@ function HomeView({
   onSelectDoc,
   onOpenCompliance,
   onRunAudit,
+  jurisdiction,
+  setJurisdiction,
   user,
-  signInWithGoogle
+  signInWithGoogle,
 }: {
   onSelectDoc: (type: DocumentType) => void;
   onOpenCompliance: () => void;
   onRunAudit: (url: string) => void;
+  jurisdiction: 'IN' | 'GLOBAL';
+  setJurisdiction: (j: 'IN' | 'GLOBAL') => void;
   user: any;
-  signInWithGoogle: () => Promise<any>;
+  signInWithGoogle: () => void;
 }) {
   const [siteUrl, setSiteUrl] = useState("");
   const [selectedBiz, setSelectedBiz] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
-  
-  // 🔒 DOMAIN VERIFICATION STATE
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [pendingUrl, setPendingUrl] = useState('');
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>('file');
+  const [verificationEmail, setVerificationEmail] = useState('');
   const [verificationToken, setVerificationToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
+  const [verificationConfirmed, setVerificationConfirmed] = useState(false);
 
   const filteredDocs = useMemo(() => {
     if (!selectedBiz) return DOC_CONFIGS;
@@ -2325,69 +2464,17 @@ function HomeView({
     return DOC_CONFIGS.filter(d => biz.docs.includes(d.type));
   }, [selectedBiz]);
 
-  const handleLoginAndContinue = async () => {
-    try {
-      await signInWithGoogle();
-      setShowAuthModal(false);
-      // After login, retry the audit
-      if (siteUrl.trim()) {
-        const auditsToday = getAuditsToday();
-        if (auditsToday >= MAX_FREE_AUDITS_PER_DAY) {
-          setRateLimitError(`Daily limit reached (${MAX_FREE_AUDITS_PER_DAY} free audits/day). Sign in for unlimited audits.`);
-          return;
-        }
-        incrementAuditCount();
-        onRunAudit(siteUrl);
-      }
-    } catch (error) {
-      console.error('Sign in failed:', error);
-    }
-  };
-
-  // ═══════════════════════════════════════════
-  // DOMAIN VERIFICATION FUNCTIONS
-  // ═══════════════════════════════════════════
-  
   const startDomainVerification = useCallback((url: string) => {
     setPendingUrl(url);
     setVerificationToken(generateVerificationToken());
     setVerificationMethod('file');
+    setVerificationEmail(`admin@${extractDomain(url)}`);
     setVerificationError(null);
     setVerificationSuccess(false);
+    setVerificationConfirmed(false);
     setShowVerificationModal(true);
   }, []);
-  
-  const performDomainVerification = useCallback(async () => {
-    if (!user?.email) return;
-    
-    setIsVerifying(true);
-    setVerificationError(null);
-    
-    try {
-      // SIMULATED VERIFICATION (for development)
-      // In production, replace with actual API call to verify domain
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const domain = extractDomain(pendingUrl);
-      if (domain) {
-        // Save as verified for THIS USER only
-        saveVerifiedDomain(domain, verificationMethod, user.email);
-        setVerificationSuccess(true);
-        
-        // Auto-close and run audit after success
-        setTimeout(() => {
-          setShowVerificationModal(false);
-          incrementAuditCount();
-          onRunAudit(pendingUrl);
-        }, 1500);
-      }
-    } catch (error) {
-      setVerificationError('Verification failed. Please try again.');
-    } finally {
-      setIsVerifying(false);
-    }
-  }, [pendingUrl, verificationMethod, user, onRunAudit]);
-  
+
   const copyToClipboard = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -2396,32 +2483,82 @@ function HomeView({
     }
   }, []);
 
+  const performDomainVerification = useCallback(async () => {
+    if (!user?.email) {
+      setVerificationError('You must be logged in to verify a domain.');
+      return;
+    }
+    if (!verificationConfirmed) {
+      setVerificationError('Please check the confirmation checkbox.');
+      return;
+    }
+    if (verificationMethod === 'email' && !verificationEmail) {
+      setVerificationError('Please enter an email address.');
+      return;
+    }
+    setIsVerifying(true);
+    setVerificationError(null);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const domain = extractDomain(pendingUrl);
+      if (domain) {
+        saveVerifiedDomain(domain, verificationMethod, user.email);
+        setVerificationSuccess(true);
+        setTimeout(() => {
+          setShowVerificationModal(false);
+          incrementAuditCount();
+          onRunAudit(pendingUrl);
+        }, 1200);
+      }
+    } catch (error) {
+      setVerificationError('Verification failed.');
+    } finally {
+      setIsVerifying(false);
+    }
+  }, [pendingUrl, verificationMethod, verificationEmail, verificationConfirmed, user, onRunAudit]);
+
+  const handleLoginAndContinue = async () => {
+    try {
+      await signInWithGoogle();
+      setShowAuthModal(false);
+      if (siteUrl.trim()) {
+        const auditsToday = getAuditsToday();
+        if (auditsToday >= MAX_FREE_AUDITS_PER_DAY) {
+          setRateLimitError(`Daily limit reached (${MAX_FREE_AUDITS_PER_DAY}).`);
+          return;
+        }
+        const domain = extractDomain(siteUrl);
+        if (domain && !isDomainVerifiedForUser(domain, user?.email || '')) {
+          startDomainVerification(siteUrl);
+        } else {
+          incrementAuditCount();
+          onRunAudit(siteUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Sign in failed:', error);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setRateLimitError(null);
-    
     if (siteUrl.trim()) {
-      // 🔒 STEP 1: Check authentication
       if (!user) {
         const auditsToday = getAuditsToday();
         if (auditsToday >= MAX_FREE_AUDITS_PER_DAY) {
-          setRateLimitError(`Daily limit reached (${MAX_FREE_AUDITS_PER_DAY} free audits/day). Sign in for unlimited audits.`);
+          setRateLimitError(`Daily limit reached.`);
           setShowAuthModal(true);
           return;
         }
         setShowAuthModal(true);
         return;
       }
-      
-      // 🔒 STEP 2: Check domain verification (CRITICAL!)
       const domain = extractDomain(siteUrl);
       if (domain && !isDomainVerifiedForUser(domain, user.email)) {
-        // Domain NOT verified for this user → Show verification modal
         startDomainVerification(siteUrl);
         return;
       }
-      
-      // ✅ User authenticated AND domain verified → Run audit
       incrementAuditCount();
       onRunAudit(siteUrl);
     } else {
@@ -2431,6 +2568,60 @@ function HomeView({
 
   return (
     <div className="bg-[#FAFAF9] dark:bg-slate-950 font-sans text-slate-700 dark:text-slate-300 selection:bg-[#C2410C]/15 selection:text-[#9A3412] pb-20">
+      {/* JURISDICTION TOGGLE */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
+        <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm max-w-md mx-auto">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Legal Framework:</span>
+          <button
+            onClick={() => setJurisdiction('IN')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              jurisdiction === 'IN'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-400'
+            }`}
+          >
+            🇮🇳 India
+          </button>
+          <button
+            onClick={() => setJurisdiction('GLOBAL')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              jurisdiction === 'GLOBAL'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-400'
+            }`}
+          >
+            🌍 Global
+          </button>
+        </div>
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
+        <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm max-w-md mx-auto">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Legal Framework:</span>
+          <button
+            onClick={() => setJurisdiction('IN')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              jurisdiction === 'IN'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-400'
+            }`}
+          >
+            🇮🇳 India
+          </button>
+          <button
+            onClick={() => setJurisdiction('GLOBAL')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              jurisdiction === 'GLOBAL'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-400'
+            }`}
+          >
+            🌍 Global
+          </button>
+        </div>
+      </div>
+
+      {/* 1. HERO SECTION */}
+
       {/* 1. HERO SECTION */}
       <section className="p-4 sm:p-6 max-w-7xl mx-auto">
         <div className="bg-gradient-to-br from-[#C2410C] via-[#C2410C]/95 to-[#9A3412] rounded-[2rem] min-h-[80vh] p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden transform-gpu" style={{ transform: "perspective(1200px) rotateX(0.5deg)", boxShadow: "0 25px 60px -12px rgba(194, 65, 12, 0.35), 0 0 0 1px rgba(194, 65, 12, 0.1), inset 0 1px 0 rgba(255,255,255,0.1)" }}>
@@ -2827,7 +3018,7 @@ function HomeView({
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          🔒 DOMAIN VERIFICATION MODAL (SECURITY FEATURE)
+          🔒 DOMAIN VERIFICATION MODAL (PROFESSIONAL VERSION)
          ═══════════════════════════════════════════════════════ */}
       {showVerificationModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -2836,258 +3027,314 @@ function HomeView({
             onClick={() => !isVerifying && setShowVerificationModal(false)}
           />
           
-          <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700">
+          <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700">
             
-            {/* Header */}
-            <div className="p-6 sm:p-8 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-4">
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                  verificationSuccess ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-orange-100 dark:bg-orange-900/30'
-                }`}>
-                  {verificationSuccess ? (
-                    <CheckCircle2 className="w-7 h-7 text-emerald-600" />
-                  ) : (
-                    <ShieldAlert className="w-7 h-7 text-[#C2410C]" />
-                  )}
+            {/* Header - Professional Clean Design */}
+            <div className="p-8 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-slate-50 to-orange-50 dark:from-slate-900 dark:to-orange-950/20">
+              {!verificationSuccess ? (
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#C2410C]/10 rounded-xl flex items-center justify-center">
+                      <ShieldAlert className="w-6 h-6 text-[#C2410C]" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                        Domain Verification Required
+                      </h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Prove you own this website to run a compliance audit
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => !isVerifying && setShowVerificationModal(false)}
+                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <XCircle className="w-5 h-5 text-slate-400" />
+                  </button>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                    {verificationSuccess ? '✅ Domain Verified!' : '🔒 Verify Domain Ownership'}
+              ) : (
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                    Domain Verified Successfully!
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    {verificationSuccess 
-                      ? `${extractDomain(pendingUrl)} is now verified`
-                      : 'Security: Prove you own this website to run a compliance audit'
-                    }
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {extractDomain(pendingUrl)} has been verified
                   </p>
                 </div>
-              </div>
+              )}
             </div>
             
             {!verificationSuccess ? (
               <>
-                {/* Warning Banner */}
-                <div className="mx-6 sm:mx-8 mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span><strong>Required:</strong> You can only audit websites you own. Choose a verification method below.</span>
-                  </p>
-                </div>
-
-                {/* Domain Info */}
-                <div className="px-6 sm:px-8 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Globe className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-600 dark:text-slate-300">Website to verify:</span>
-                    <span className="font-medium text-slate-900 dark:text-white">{extractDomain(pendingUrl)}</span>
+                {/* Domain Being Verified */}
+                <div className="px-8 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-3">
+                    <Globe className="w-5 h-5 text-[#C2410C]" />
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Website:</span>
+                    <code className="px-3 py-1 bg-white dark:bg-slate-900 rounded-lg text-sm font-mono text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
+                      {extractDomain(pendingUrl)}
+                    </code>
                   </div>
                 </div>
 
-                {/* Verification Methods */}
-                <div className="p-6 sm:p-8 space-y-6">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#9A3412] dark:text-orange-500 mb-4 block">
-                    Choose Verification Method
-                  </label>
-                  
-                  <div className="space-y-3">
-                    {/* Method 1: HTML File */}
-                    <button
-                      onClick={() => setVerificationMethod('file')}
-                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                        verificationMethod === 'file'
-                          ? 'border-[#C2410C] bg-[#C2410C]/5'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                          verificationMethod === 'file' ? 'bg-[#C2410C] text-white' : 'bg-slate-100 dark:bg-slate-800'
-                        }`}>
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-slate-900 dark:text-white text-sm">HTML File Upload</div>
-                          <div className="text-xs text-slate-500 mt-1">Upload a verification file to your website</div>
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Method 2: Meta Tag */}
-                    <button
-                      onClick={() => setVerificationMethod('meta')}
-                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                        verificationMethod === 'meta'
-                          ? 'border-[#C2410C] bg-[#C2410C]/5'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                          verificationMethod === 'meta' ? 'bg-[#C2410C] text-white' : 'bg-slate-100 dark:bg-slate-800'
-                        }`}>
-                          <Code className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-slate-900 dark:text-white text-sm">Meta Tag</div>
-                          <div className="text-xs text-slate-500 mt-1">Add meta tag to your website's head</div>
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Method 3: DNS */}
-                    <button
-                      onClick={() => setVerificationMethod('dns')}
-                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                        verificationMethod === 'dns'
-                          ? 'border-[#C2410C] bg-[#C2410C]/5'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                          verificationMethod === 'dns' ? 'bg-[#C2410C] text-white' : 'bg-slate-100 dark:bg-slate-800'
-                        }`}>
-                          <Server className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-slate-900 dark:text-white text-sm">DNS TXT Record</div>
-                          <div className="text-xs text-slate-500 mt-1">Add TXT record to DNS configuration</div>
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Method 4: Email */}
-                    <button
-                      onClick={() => setVerificationMethod('email')}
-                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                        verificationMethod === 'email'
-                          ? 'border-[#C2410C] bg-[#C2410C]/5'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                          verificationMethod === 'email' ? 'bg-[#C2410C] text-white' : 'bg-slate-100 dark:bg-slate-800'
-                        }`}>
-                          <Mail className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-slate-900 dark:text-white text-sm">Email Verification</div>
-                          <div className="text-xs text-slate-500 mt-1">Verify via @{extractDomain(pendingUrl)} email</div>
-                        </div>
-                      </div>
-                    </button>
+                {/* Step Indicator */}
+                <div className="px-8 py-4 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#C2410C] text-white text-[10px]">1</span>
+                    <span>Choose Method</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 text-[10px]">2</span>
+                    <span>Follow Instructions</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 text-[10px]">3</span>
+                    <span>Confirm & Verify</span>
                   </div>
+                </div>
 
-                  {/* Instructions based on method */}
-                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200">
-                    <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4 text-amber-500" />
-                      Instructions
+                {/* Content */}
+                <div className="p-8 space-y-6">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-4 uppercase tracking-wider">
+                      Select Verification Method
                     </h4>
                     
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Method Cards */}
+                      {[
+                        { id: 'file' as const, icon: FileText, title: 'HTML File', desc: 'Upload a file to your server' },
+                        { id: 'meta' as const, icon: Code, title: 'Meta Tag', desc: 'Add code to &lt;head&gt;' },
+                        { id: 'dns' as const, icon: Server, title: 'DNS Record', desc: 'Add TXT record to DNS' },
+                        { id: 'email' as const, icon: Mail, title: 'Email', desc: 'Verify via domain email' },
+                      ].map((method) => (
+                        <button
+                          key={method.id}
+                          onClick={() => setVerificationMethod(method.id)}
+                          className={`p-4 rounded-xl border-2 text-left transition-all ${
+                            verificationMethod === method.id
+                              ? 'border-[#C2410C] bg-[#C2410C]/5 shadow-sm'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                              verificationMethod === method.id 
+                                ? 'bg-[#C2410C] text-white' 
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600'
+                            }`}>
+                              <method.icon className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className={`font-semibold text-sm ${
+                                verificationMethod === method.id 
+                                  ? 'text-[#C2410C]' 
+                                  : 'text-slate-900 dark:text-white'
+                              }`}>{method.title}</div>
+                              <div className="text-xs text-slate-500">{method.desc}</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Instructions Panel */}
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-5 border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lightbulb className="w-4 h-4 text-amber-500" />
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                        Step-by-Step Instructions
+                      </h4>
+                    </div>
+                    
                     {verificationMethod === 'file' && (
-                      <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                        <p>1. Create file <code className="bg-slate-200 px-1 rounded">legalgen-verify.html</code>:</p>
-                        <div className="bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs font-mono relative group overflow-x-auto">
-                          <pre>{`<!DOCTYPE html>
+                      <ol className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                        <li className="flex gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#C2410C] text-white text-xs flex items-center justify-center font-bold">1</span>
+                          <div>Create a file named <code className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded text-xs font-mono">legalgen-verify.html</code></div>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#C2410C] text-white text-xs flex items-center justify-center font-bold">2</span>
+                          <div>Add this content to the file:</div>
+                        </li>
+                        <li className="ml-9">
+                          <div className="relative group">
+                            <pre className="bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs font-mono overflow-x-auto"><code>{`<!DOCTYPE html>
 <html>
-<head><title>LegalGen Verification</title></head>
+<head><title>Verification</title></head>
 <body>
-<span data-token="${verificationToken}">${verificationToken}</span>
+<span data-legalgen="${verificationToken}">${verificationToken}</span>
 </body>
-</html>`}</pre>
-                          <button 
-                            onClick={() => copyToClipboard(verificationToken)}
-                            className="absolute top-2 right-2 p-1.5 bg-slate-700 hover:bg-slate-600 rounded opacity-0 group-hover:opacity-100"
-                          >
-                            <Copy className="w-4 h-4 text-slate-300" />
-                          </button>
-                        </div>
-                        <p>2. Upload to: <code className="bg-slate-200 px-1 rounded">https://{extractDomain(pendingUrl)}/legalgen-verify.html</code></p>
-                      </div>
+</html>`}</code></pre>
+                            <button 
+                              onClick={() => copyToClipboard(verificationToken)}
+                              className="absolute top-2 right-2 p-1.5 bg-slate-700 hover:bg-slate-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Copy token"
+                            >
+                              <Copy className="w-4 h-4 text-slate-300" />
+                            </button>
+                          </div>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#C2410C] text-white text-xs flex items-center justify-center font-bold">3</span>
+                          <div>Upload to: <code className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded text-xs font-mono">https://{extractDomain(pendingUrl)}/legalgen-verify.html</code></div>
+                        </li>
+                      </ol>
                     )}
-                    
+
                     {verificationMethod === 'meta' && (
-                      <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                        <p>Add this to your <code className="bg-slate-200 px-1 rounded">&lt;head&gt;</code>:</p>
-                        <div className="bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs font-mono relative group">
-                          <pre>{`<meta name="legalgen-verify" content="${verificationToken}" />`}</pre>
-                          <button 
-                            onClick={() => copyToClipboard(`<meta name="legalgen-verify" content="${verificationToken}" />`)}
-                            className="absolute top-2 right-2 p-1.5 bg-slate-700 hover:bg-slate-600 rounded opacity-0 group-hover:opacity-100"
-                          >
-                            <Copy className="w-4 h-4 text-slate-300" />
-                          </button>
-                        </div>
-                      </div>
+                      <ol className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                        <li className="flex gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#C2410C] text-white text-xs flex items-center justify-center font-bold">1</span>
+                          <div>Open your website's HTML file</div>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#C2410C] text-white text-xs flex items-center justify-center font-bold">2</span>
+                          <div>Add this inside <code className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded text-xs font-mono">&lt;head&gt;</code> section:</div>
+                        </li>
+                        <li className="ml-9">
+                          <div className="relative group">
+                            <pre className="bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs font-mono"><code>{`<meta name="legalgen-verification" content="${verificationToken}" />`}</code></pre>
+                            <button 
+                              onClick={() => copyToClipboard(`<meta name="legalgen-verification" content="${verificationToken}" />`)}
+                              className="absolute top-2 right-2 p-1.5 bg-slate-700 hover:bg-slate-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Copy className="w-4 h-4 text-slate-300" />
+                            </button>
+                          </div>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#C2410C] text-white text-xs flex items-center justify-center font-bold">3</span>
+                          <div>Save and upload the updated file</div>
+                        </li>
+                      </ol>
                     )}
-                    
+
                     {verificationMethod === 'dns' && (
-                      <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                        <p>Add DNS TXT record:</p>
-                        <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg space-y-2 text-xs">
-                          <div className="flex justify-between">
-                            <span className="font-medium">Type:</span>
-                            <code>TXT</code>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="font-medium">Host:</span>
-                            <code>@</code>
-                          </div>
-                          <div className="flex justify-between items-start gap-2">
-                            <span className="font-medium">Value:</span>
-                            <code className="break-all text-right">legalgen-verify={verificationToken}</code>
-                          </div>
+                      <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                        <p>Go to your DNS provider (Cloudflare, GoDaddy, etc.) and add:</p>
+                        <div className="bg-white dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200">
+                          <table className="w-full text-xs">
+                            <thead className="bg-slate-100 dark:bg-slate-800">
+                              <tr>
+                                <th className="text-left p-2 font-semibold text-slate-700 dark:text-slate-300">Type</th>
+                                <th className="text-left p-2 font-semibold text-slate-700 dark:text-slate-300">Host</th>
+                                <th className="text-left p-2 font-semibold text-slate-700 dark:text-slate-300">Value</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-t border-slate-200">
+                                <td className="p-2"><code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">TXT</code></td>
+                                <td className="p-2"><code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">@</code></td>
+                                <td className="p-2 break-all"><code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">legalgen-verify={verificationToken}</code></td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                      </div>
-                    )}
-                    
-                    {verificationMethod === 'email' && (
-                      <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                        <p>Email will be sent to:</p>
-                        <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
-                          <code className="font-mono">admin@{extractDomain(pendingUrl)}</code>
-                        </div>
-                        <p className="text-amber-600 text-xs flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          You need access to emails at this domain
+                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          DNS changes may take up to 48 hours to propagate
                         </p>
                       </div>
                     )}
+
+                    {verificationMethod === 'email' && (
+                      <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                        <p><strong>Enter an email address at your domain:</strong></p>
+                        <p className="text-xs">The verification link will be sent to this address. You must have access to receive emails here.</p>
+                        
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Mail className="w-4 h-4 text-[#C2410C]" />
+                          </div>
+                          <input
+                            type="email"
+                            value={verificationEmail}
+                            onChange={(e) => setVerificationEmail(e.target.value)}
+                            placeholder={`admin@${extractDomain(pendingUrl)}`}
+                            className="w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono text-sm focus:ring-2 focus:ring-[#C2410C] focus:border-transparent outline-none transition-all"
+                          />
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 space-y-2">
+                          <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Common options:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {['admin', 'webmaster', 'postmaster', 'info', 'contact'].map((prefix) => (
+                              <button
+                                key={prefix}
+                                onClick={() => setVerificationEmail(`${prefix}@${extractDomain(pendingUrl)}`)}
+                                className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-mono hover:border-[#C2410C] hover:text-[#C2410C] transition-colors"
+                              >
+                                {prefix}@{extractDomain(pendingUrl)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span><strong>Important:</strong> You must have access to receive emails at this domain address. The email contains a verification link you'll need to click to prove ownership.</span>
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Error */}
+                  {/* Confirmation Checkbox */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={verificationConfirmed}
+                        onChange={(e) => {
+                          setVerificationConfirmed(e.target.checked);
+                          if (e.target.checked) {
+                            setVerificationError(null); // Clear error when checked
+                          }
+                        }}
+                        className="mt-1 w-4 h-4 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]" 
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-300">
+                        I have completed the verification steps above and confirm that I own this website. I understand that unauthorized access to someone else's website is a security violation.
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Error Message */}
                   {verificationError && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                      <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-                      <p className="text-sm text-red-700">{verificationError}</p>
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3">
+                      <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-700 dark:text-red-400">{verificationError}</p>
                     </div>
                   )}
 
-                  {/* Buttons */}
+                  {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
                     <button
                       onClick={performDomainVerification}
                       disabled={isVerifying}
-                      className="flex-1 bg-[#C2410C] hover:bg-[#9A3412] disabled:bg-slate-300 text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                      className="flex-1 bg-[#C2410C] hover:bg-[#9A3412] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider"
                     >
                       {isVerifying ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Verifying...
+                          Verifying Domain...
                         </>
                       ) : (
                         <>
-                          <ShieldCheck className="w-4 h-4" />
-                          Verify & Run Audit
+                          <ShieldCheck className="w-5 h-5" />
+                          Confirm & Run Audit
                         </>
                       )}
                     </button>
                     <button
                       onClick={() => setShowVerificationModal(false)}
                       disabled={isVerifying}
-                      className="py-3 px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+                      className="py-4 px-6 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -3096,26 +3343,41 @@ function HomeView({
               </>
             ) : (
               /* Success State */
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 mx-auto mb-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+              <div className="p-8">
+                <div className="text-center mb-6">
+                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                    Your domain has been successfully verified. Starting compliance audit now...
+                  </p>
                 </div>
-                <h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                  Verification Successful!
-                </h4>
-                <p className="text-sm text-slate-500 mb-4">
-                  Starting compliance audit for {extractDomain(pendingUrl)}...
-                </p>
-                <Loader2 className="w-6 h-6 text-[#C2410C] animate-spin mx-auto" />
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6">
+                  <div className="flex items-center justify-center gap-3">
+                    <Loader2 className="w-5 h-5 text-[#C2410C] animate-spin" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Running compliance audit for {extractDomain(pendingUrl)}...
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200">
-              <p className="text-[11px] text-slate-500 text-center flex items-center justify-center gap-1.5">
-                <Lock className="w-3 h-3" />
-                Secure verification • Data stored locally
-              </p>
+            <div className="px-8 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <Lock className="w-3 h-3" />
+                  Secure Verification
+                </span>
+                <span className="flex items-center gap-1.5">
+                  {user ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      Authenticated
+                    </>
+                  ) : (
+                    'Not authenticated'
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -3255,8 +3517,61 @@ function HomeView({
             ))}
           </div>
         </div>
-      </section>
-
-    </div >
+    </section>
+    </div>
   );
+}
+/* ==========================================
+   FOOTER GENERATOR (Pasted directly here)
+   ========================================== */
+function generateFooterHTML(
+  jurisdiction: 'IN' | 'GLOBAL', 
+  documentType: string, 
+  isProUser: boolean
+): string {
+  const currentDate = new Date().toLocaleDateString('en-IN', { 
+    year: 'numeric', month: 'long', day: 'numeric' 
+  });
+
+  const jurisdictionText = jurisdiction === 'IN' 
+    ? 'the Information Technology Act 2000, the Digital Personal Data Protection (DPDP) Act 2023, and the Consumer Protection Act 2019' 
+    : 'general international standards, including GDPR and CCPA principles';
+  
+  const badge = jurisdiction === 'IN' 
+    ? '<span style="background:#ecfdf5;color:#065f46;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid #a7f3d0;">🇮🇳 DPDP Act Ready</span>'
+    : '<span style="background:#eff6ff;color:#1e40af;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid #bfdbfe;">🌍 GDPR Aligned</span>';
+
+  // IMPORTANT: Change 'https://your-footer-domain.com' to your actual website URL!
+  const attribution = !isProUser ? `
+    <div style="margin-top:24px;text-align:center;font-size:13px;color:#6b7280;border-top:1px dashed #d1d5db;padding-top:16px;">
+      Generated by <a href="https://your-footer-domain.com" target="_blank" style="font-weight:bold;color:#4f46e5;text-decoration:underline;">FOOTER</a>. 
+      <a href="https://your-footer-domain.com/pricing" target="_blank" style="color:#4f46e5;font-weight:600;text-decoration:none;">Upgrade to Pro</a> to remove this attribution, unlock PDF/DOCX exports, and enable auto-updating policies.
+    </div>
+  ` : '';
+
+  return `
+    <div style="margin-top:48px;padding-top:32px;border-top:2px solid #e5e7eb;font-size:14px;color:#4b5563;font-family:system-ui, -apple-system, sans-serif;">
+      <div style="background:#f9fafb;padding:20px;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:20px;">
+        <p style="font-weight:700;color:#1f2937;margin:0 0 10px 0;font-size:15px;">⚖️ Legal Disclaimer</p>
+        <p style="line-height:1.6;margin:0;font-size:13px;">
+          This ${documentType} is a template generated for informational purposes based on the details provided. 
+          It is designed to align with ${jurisdictionText}. 
+          This document does not constitute formal legal advice. We strongly recommend having a qualified legal professional in your jurisdiction review this document before publication to ensure full compliance with your specific business operations.
+        </p>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;font-size:12px;color:#6b7280;">
+        <div>
+          <p style="margin:0 0 4px 0;">Generated on: <span style="font-weight:600;color:#374151;">${currentDate}</span></p>
+          <p style="margin:0;">Jurisdiction Framework: <span style="font-weight:600;color:#374151;">${jurisdiction === 'IN' ? 'India' : 'Global'}</span></p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          ${badge}
+          <span style="background:#f3f4f6;color:#374151;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid #d1d5db;">AI-Assisted Draft</span>
+        </div>
+      </div>
+
+      ${attribution}
+    </div>
+  `;
 }
