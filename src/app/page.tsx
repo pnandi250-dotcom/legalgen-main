@@ -1,10 +1,13 @@
 import '@/lib/polyfills';
+
 "use client";
+
+import React, { useState, useCallback, useRef, useMemo, useEffect, forwardRef } from "react";
 import html2pdf from 'html2pdf.js';
 import { Code2 } from "lucide-react";
 import { saveDocumentToDb } from "@/lib/firebase/firestore";
 import { trackGeneration, trackAudit } from "@/lib/firebase/analytics";
-import { useAuth } from "@/lib/firebase/AuthContext"; import React, { useState, useCallback, useRef, useMemo, useEffect, forwardRef } from "react";
+import { useAuth } from "@/lib/firebase/AuthContext";
 import {
   Shield, FileText, RefreshCcw, Cookie, AlertTriangle,
   Truck, ArrowRight, ArrowLeft, Copy, Check, Download,
