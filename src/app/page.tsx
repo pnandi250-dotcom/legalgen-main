@@ -1,7 +1,5 @@
-import '@/lib/polyfills';
-
 "use client";
-
+import '@/lib/polyfills';
 import React, { useState, useCallback, useRef, useMemo, useEffect, forwardRef } from "react";
 import html2pdf from 'html2pdf.js';
 import { Code2 } from "lucide-react";
