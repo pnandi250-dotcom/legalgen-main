@@ -1,3 +1,4 @@
+import '@/lib/polyfills';
 "use client";
 import html2pdf from 'html2pdf.js';
 import { Code2 } from "lucide-react";
