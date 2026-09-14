@@ -47,8 +47,8 @@ class PlaywrightScraper {
           html: document.documentElement.outerHTML,
           text: document.body.innerText,
           title: document.title,
-          links: Array.from(document.querySelectorAll('a[href]')).map(a => a.href),
-          scripts: Array.from(document.querySelectorAll('script[src]')).map(s => s.src),
+          links: Array.from(document.querySelectorAll('a[href]')).map(a => (a as HTMLAnchorElement).href),
+scripts: Array.from(document.querySelectorAll('script[src]')).map(s => (s as HTMLScriptElement).src),
           metaTags: Object.fromEntries(
             Array.from(document.querySelectorAll('meta[name], meta[property]'))
               .map(m => [m.getAttribute('name') || m.getAttribute('property'), m.getAttribute('content')])
