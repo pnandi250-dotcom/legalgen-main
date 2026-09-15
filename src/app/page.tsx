@@ -6,6 +6,7 @@ import { Code2 } from "lucide-react";
 import { saveDocumentToDb } from "@/lib/firebase/firestore";
 import { trackGeneration, trackAudit } from "@/lib/firebase/analytics";
 import { useAuth } from "@/lib/firebase/AuthContext";
+import { JurisdictionSelector } from '@/components/ui/JurisdictionSelector';
 import {
   Shield, FileText, RefreshCcw, Cookie, AlertTriangle,
   Truck, ArrowRight, ArrowLeft, Copy, Check, Download,
@@ -37,6 +38,8 @@ import type { DocumentType, FormData, QuestionGroup } from "@/lib/legalgen/types
 import { getQuestions } from "@/lib/legalgen/questions";
 import { analyzeWebsiteText, FEATURE_LABELS, featuresToFormData, type WebsiteAnalysisResult } from "@/lib/legal-engine/website-analyzer";
 import { generatePrivacyPolicy } from "@/lib/legalgen/privacy-policy";
+import { generateMultiJurisdictionPrivacyPolicy } from "@/lib/legalgen/privacy-policy-multi-jurisdiction";
+import type { Jurisdiction } from "@/lib/legalgen/types";
 import { generateTermsOfService } from "@/lib/legalgen/terms-of-service";
 import { generateRefundPolicy } from "@/lib/legalgen/refund-policy";
 import { generateCookiePolicy } from "@/lib/legalgen/cookie-policy";
@@ -515,39 +518,29 @@ const BUSINESS_CATEGORIES: Record<string, {
     desc: "Any other business or startup"
   },
 };
-function generateDocument(type: DocumentType, data: FormData, jurisdiction: 'IN' | 'GLOBAL') {
-  // 1. Create a container for the original document object
-  let doc: { html: string; text: string; title: string } = { html: "", text: "", title: "" };
-
-  // 2. Get the original document based on the type
+/* ─── GENERATE FUNCTION ─── */
+function generateDocument(type: DocumentType, data: FormData, jur: Jurisdiction = 'IN') {
   switch (type) {
-    case "privacy-policy": doc = generatePrivacyPolicy(data); break;
-    case "terms-of-service": doc = generateTermsOfService(data); break;
-    case "refund-policy": doc = generateRefundPolicy(data); break;
-    case "cookie-policy": doc = generateCookiePolicy(data); break;
-    case "disclaimer": doc = generateDisclaimer(data); break;
-    case "shipping-policy": doc = generateShippingPolicy(data); break;
-    case "cancellation-policy": doc = generateCancellationPolicy(data); break;
-    case "return-policy": doc = generateReturnPolicy(data); break;
-    case "service-level-agreement": doc = generateServiceLevelAgreement(data); break;
-    case "community-guidelines": doc = generateCommunityGuidelines(data); break;
-    case "gdpr-compliance": doc = generateGDPRCompliance(data); break;
-    case "data-processing-agreement": doc = generateDataProcessingAgreement(data); break;
-    case "dmca-policy": doc = generateDmcaPolicy(data); break;
-    case "content-moderation-policy": doc = generateContentModerationPolicy(data); break;
-    case "acceptable-use-policy": doc = generateAup(data); break;
+    case "privacy-policy": 
+      if (jur !== 'IN') {
+        return generateMultiJurisdictionPrivacyPolicy(data, jur);
+      }
+      return generatePrivacyPolicy(data);
+    case "terms-of-service": return generateTermsOfService(data);
+    case "refund-policy": return generateRefundPolicy(data);
+    case "cookie-policy": return generateCookiePolicy(data);
+    case "disclaimer": return generateDisclaimer(data);
+    case "shipping-policy": return generateShippingPolicy(data);
+    case "cancellation-policy": return generateCancellationPolicy(data);
+    case "return-policy": return generateReturnPolicy(data);
+    case "service-level-agreement": return generateServiceLevelAgreement(data);
+    case "community-guidelines": return generateCommunityGuidelines(data);
+    case "gdpr-compliance": return generateGDPRCompliance(data);
+    case "data-processing-agreement": return generateDataProcessingAgreement(data);
+    case "dmca-policy": return generateDmcaPolicy(data);
+    case "content-moderation-policy": return generateContentModerationPolicy(data);
+    case "acceptable-use-policy": return generateAup(data);
   }
-
-  // 3. Generate the FOOTER HTML
-     // Uses the user's selected jurisdiction from the UI
-   const selectedJurisdiction = jurisdiction;
-  const isProUser = false;   // Change to true later for paid users
-     const footerHtml = generateFooterHTML(jurisdiction, type, isProUser);
-
-  // 4. Append the footer ONLY to the HTML part, and return the full object
-  doc.html = doc.html + footerHtml;
-  
-  return doc;
 }
 /* ─── QUESTION FIELD ─── */
 function QuestionField({
@@ -705,7 +698,7 @@ function QuestionField({
    ═══════════════════════════════════════════ */
 function QuestionnaireView({
   groups, step, formData, updateField, onNext, onBack, isLastStep, currentConfig, isGenerating, progress,
-  fromCompliance, jurisdiction,
+  fromCompliance, jurisdiction, onJurisdictionChange,
 }: {
   groups: QuestionGroup[];
   step: number;
@@ -718,9 +711,9 @@ function QuestionnaireView({
   isGenerating: boolean;
   progress: number;
   fromCompliance?: boolean;
-  jurisdiction?: 'IN' | 'GLOBAL';
-}) {
-  const currentGroup = groups[step];
+  jurisdiction?: Jurisdiction;
+  onJurisdictionChange?: (jur: Jurisdiction) => void;
+}) {  const currentGroup = groups[step];
   const [showWarning, setShowWarning] = useState<string | null>(null);
 
   if (!currentGroup) return null;
@@ -973,10 +966,10 @@ export default function LegalGenPage() {
   const [view, setView] = useState<View>("home");
   const [selectedDoc, setSelectedDoc] = useState<DocumentType | null>(null);
   const [formData, setFormData] = useState<FormData>({});
-  const [step, setStep] = useState(0);
-  const [generatedDoc, setGeneratedDoc] = useState<{ html: string; text: string; title: string } | null>(null);
-     const [jurisdiction, setJurisdiction] = useState<'IN' | 'GLOBAL'>('IN');
-  const [copiedHtml, setCopiedHtml] = useState(false);
+const [jurisdiction, setJurisdiction] = useState<Jurisdiction>('IN');
+const [step, setStep] = useState(0);
+const [generatedDoc, setGeneratedDoc] = useState<{ html: string; text: string; title: string } | null>(null);
+const [copiedHtml, setCopiedHtml] = useState(false); 
   const [copiedText, setCopiedText] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -993,10 +986,17 @@ export default function LegalGenPage() {
   const [fromCompliance, setFromCompliance] = useState(false);
   const [detectedAnalysis, setDetectedAnalysis] = useState<WebsiteAnalysisResult | null>(null);
 
-  const questions = useMemo(() => {
+const questions = useMemo(() => {
     if (!selectedDoc) return [];
-    return getQuestions(selectedDoc);
-  }, [selectedDoc]);
+    const allQuestions = getQuestions(selectedDoc);
+    // Filter question groups based on selected jurisdiction
+    return allQuestions.filter(group => {
+      // If group has no jurisdictions filter, show for all
+      if (!group.jurisdictions) return true;
+      // If group has jurisdictions filter, only show if current jurisdiction is included
+      return group.jurisdictions.includes(jurisdiction) || jurisdiction === 'GLOBAL';
+    });
+  }, [selectedDoc, jurisdiction]);
   useScrollReveal();
 
   const totalSteps = questions.length;
@@ -2440,8 +2440,8 @@ function HomeView({
   onSelectDoc: (type: DocumentType) => void;
   onOpenCompliance: () => void;
   onRunAudit: (url: string) => void;
-  jurisdiction: 'IN' | 'GLOBAL';
-  setJurisdiction: (j: 'IN' | 'GLOBAL') => void;
+  jurisdiction?: Jurisdiction;
+setJurisdiction?: (j: Jurisdiction) => void;
   user: any;
   signInWithGoogle: () => void;
 }) {
@@ -2575,7 +2575,7 @@ function HomeView({
         <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm max-w-md mx-auto">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Legal Framework:</span>
           <button
-            onClick={() => setJurisdiction('IN')}
+            onClick={() => setJurisdiction?.('IN')}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               jurisdiction === 'IN'
                 ? 'bg-emerald-600 text-white shadow-md'
@@ -2585,7 +2585,7 @@ function HomeView({
             🇮🇳 India
           </button>
           <button
-            onClick={() => setJurisdiction('GLOBAL')}
+            onClick={() => setJurisdiction?.('GLOBAL')}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               jurisdiction === 'GLOBAL'
                 ? 'bg-blue-600 text-white shadow-md'
@@ -2600,7 +2600,7 @@ function HomeView({
         <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm max-w-md mx-auto">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Legal Framework:</span>
           <button
-            onClick={() => setJurisdiction('IN')}
+            onClick={() => setJurisdiction?.('IN')}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               jurisdiction === 'IN'
                 ? 'bg-emerald-600 text-white shadow-md'
@@ -2610,7 +2610,7 @@ function HomeView({
             🇮🇳 India
           </button>
           <button
-            onClick={() => setJurisdiction('GLOBAL')}
+            onClick={() => setJurisdiction?.('GLOBAL')}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               jurisdiction === 'GLOBAL'
                 ? 'bg-blue-600 text-white shadow-md'
