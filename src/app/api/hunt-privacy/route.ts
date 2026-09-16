@@ -61,7 +61,7 @@ export async function GET() {
         method: 'POST',
         description: 'Hunt for privacy policies on a website',
         body: { url: 'string (required)' },
-        response: { success: boolean, data: 'HunterResult' }
+        response: { success: 'boolean', data: 'HunterResult' }  // ✅ FIXED: Added quotes around boolean
       }
     }
   });

@@ -55,7 +55,7 @@ import { generateDmcaPolicy } from "@/lib/legalgen/dmca-policy";
 import { generateContentModerationPolicy } from "@/lib/legalgen/content-moderation-policy";
 import { generateEula } from "@/lib/legalgen/eula";
 import { generateAup } from "@/lib/legalgen/aup";
-import { PrivacyHunter } from "@/components/PrivacyHunter";
+import { PrivacyHunter } from "@/components/ui/PrivacyHunter";
 
 /* ─── SCROLL REVEAL HOOK (with timeout fallback) ─── */
 function useScrollReveal() {
