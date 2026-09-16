@@ -57,6 +57,7 @@ import { generateEula } from "@/lib/legalgen/eula";
 import { generateAup } from "@/lib/legalgen/aup";
 import { PrivacyHunter } from "@/components/ui/PrivacyHunter";
 
+
 /* ─── SCROLL REVEAL HOOK (with timeout fallback) ─── */
 function useScrollReveal() {
   useEffect(() => {
