@@ -55,6 +55,7 @@ import { generateDmcaPolicy } from "@/lib/legalgen/dmca-policy";
 import { generateContentModerationPolicy } from "@/lib/legalgen/content-moderation-policy";
 import { generateEula } from "@/lib/legalgen/eula";
 import { generateAup } from "@/lib/legalgen/aup";
+import { PrivacyHunter } from "@/components/PrivacyHunter";
 
 /* ─── SCROLL REVEAL HOOK (with timeout fallback) ─── */
 function useScrollReveal() {
@@ -959,7 +960,7 @@ function QuestionnaireView({
 }
 
 /* ─── MAIN APP ─── */
-type View = "home" | "questionnaire" | "preview" | "compliance";
+type View = "home" | "questionnaire" | "preview" | "compliance" | "hunter";
 
 export default function LegalGenPage() {
   const { user, signInWithGoogle, logout } = useAuth();
@@ -1378,6 +1379,17 @@ const questions = useMemo(() => {
                   Run Audit
                 </button>
               )}
+
+              
+{/* Privacy Policy Hunter Button */}
+{view === "home" && (
+  <button
+    onClick={() => setView("hunter")}
+    className="hidden sm:block hover:text-[#C2410C] transition-colors relative after:content-[''] after:absolute after:-bottom-1.5 after:left-0 after:w-0 after:h-px after:bg-[#C2410C] hover:after:w-full after:transition-all ml-4"
+  >
+    🔍 Policy Hunter
+  </button>
+)}
 
               {view === "preview" && fromCompliance && (
                 <button
