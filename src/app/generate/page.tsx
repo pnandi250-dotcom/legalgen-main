@@ -32,6 +32,8 @@ import { generateDmcaPolicy } from "@/lib/legalgen/dmca-policy";
 import { generateContentModerationPolicy } from "@/lib/legalgen/content-moderation-policy";
 import { generateEula } from "@/lib/legalgen/eula";
 import { generateAup } from "@/lib/legalgen/aup";
+// Multi-jurisdiction compliance generators
+import { generateMultiJurisdictionPrivacyPolicy } from "@/lib/legalgen/privacy-policy-multi-jurisdiction";
 
 
 
@@ -52,6 +54,8 @@ const DOC_CONFIGS = [
     { type: "content-moderation-policy" as DocumentType, title: "Moderation", description: "Moderation rules.", icon: <ShieldCheck className="w-6 h-6" />, color: "fuchsia-700", bgColor: "bg-fuchsia-50", badge: "UGC", category: "Platform" },
     { type: "gdpr-compliance" as DocumentType, title: "GDPR", description: "EU data protection.", icon: <Scale className="w-6 h-6" />, color: "lime-700", bgColor: "bg-lime-50", badge: "EU Users", category: "Data" },
     { type: "data-processing-agreement" as DocumentType, title: "DPA", description: "B2B data terms.", icon: <Handshake className="w-6 h-6" />, color: "emerald-700", bgColor: "bg-emerald-50", badge: "B2B", category: "Data" },
+        { type: "ccpa-compliance" as DocumentType, title: "CCPA/CPRA", description: "California privacy law.", icon: <Scale className="w-6 h-6" />, color: "amber-700", bgColor: "bg-amber-50", badge: "California", category: "Data" },
+    { type: "uk-gdpr-compliance" as DocumentType, title: "UK GDPR", description: "UK data protection.", icon: <Scale className="w-6 h-6" />, color: "indigo-700", bgColor: "bg-indigo-50", badge: "UK", category: "Data" },
 ];
 
 // ✅ FIXED: Type generators correctly
@@ -72,6 +76,9 @@ const GENERATORS: Record<DocumentType, (data: FormData) => GeneratedDocument> = 
     "content-moderation-policy": generateContentModerationPolicy,
     "gdpr-compliance": generateGDPRCompliance,
     "data-processing-agreement": generateDataProcessingAgreement,
+    // Multi-jurisdiction compliance (CCPA & UK GDPR)
+    "ccpa-compliance": ((data: FormData) => generateMultiJurisdictionPrivacyPolicy(data, 'US-CA')),
+    "uk-gdpr-compliance": ((data: FormData) => generateMultiJurisdictionPrivacyPolicy(data, 'UK')),
 };
 
 type Step = 'select' | 'questions' | 'result';
