@@ -116,7 +116,7 @@ export function generateGDPRCompliance(data: FormData): GeneratedDocument {
     complianceInfo: {
       laws: relevantLaws,
       lastUpdated: new Date().toISOString(),
-      jurisdiction: 'EU / UK / India',
+            jurisdiction: 'GLOBAL',
     },
   };
 }

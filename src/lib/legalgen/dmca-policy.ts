@@ -124,7 +124,7 @@ export function generateDmcaPolicy(data: FormData): GeneratedDocument {
     complianceInfo: {
       laws: relevantLaws,
       lastUpdated: new Date().toISOString(),
-      jurisdiction: `India (${governingState})`,
+      jurisdiction: 'IN',
     },
   };
 }

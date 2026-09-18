@@ -209,7 +209,7 @@ function generateLawfulBasisSection(data: FormData, jurisdiction: Jurisdiction):
         ${basisList}
       </ul>
       ${specialCategoryContent}
-      ${data.lawfulBasis?.includes('legitimateInterests') ? `
+            ${(Array.isArray(data.lawfulBasis) && data.lawfulBasis.includes('legitimateInterests')) ? `
       <p><strong>Legitimate Interests Assessment (LIA):</strong> Where we rely on legitimate interests as our lawful basis, we have conducted and documented a Legitimate Interests Assessment balancing our interests against your rights and freedoms. You may request a copy of relevant LIAs by contacting our DPO.</p>
       ` : ''}`,
   };
@@ -331,8 +331,7 @@ function generateDataSubjectRightsSection(data: FormData, jurisdiction: Jurisdic
 
 function generateDataCollectionSection(data: FormData, jurisdiction: Jurisdiction): RenderSection {
   const dataTypes = (data.dataTypesCollected as string[]) || [];
-  const config = getJurisdictionConfig(jurisdiction);
-  
+  const config = getJurisdictionConfig(jurisdiction);  
   let dataTypeList: string;
   if (dataTypes.length > 0) {
     dataTypeList = dataTypes.map(dt => `<li><strong>${dataTypeLabels[dt] || dt}:</strong> ${getDataPurpose(dt, jurisdiction)}</li>`).join('\n      ');
@@ -787,7 +786,8 @@ export function generateMultiJurisdictionPrivacyPolicy(data: FormData, jurisdict
   const websiteUrl = safeUrl((data.websiteUrl as string) || '#');
   const email = safeEmail((data.email as string) || '[Your Email]');
   const config = getJurisdictionConfig(jurisdiction);
-  
+  const effectiveDate = escapeHtml((data.effectiveDate as string) || today());
+  const version = escapeHtml((data.version as string) || '1.0');  
   // Build sections array
   const sections: RenderSection[] = [];
   
@@ -855,16 +855,13 @@ export function generateMultiJurisdictionPrivacyPolicy(data: FormData, jurisdict
   
   // Generate HTML
   const html = renderDocument({
-  subtitle: `${config.name} Compliance (${config.primaryLaw})`,
-  sections,
-  metadata: {
+    documentTitle: `Privacy Policy — ${config.name} Compliance (${config.primaryLaw})`,
     businessName,
-    website: websiteUrl,
-    jurisdiction,
-    lastUpdated: today(),
-  },
-});
-  
+    effectiveDate,
+    version,
+    sections,
+    preambleHtml: `<p><strong>Effective Date:</strong> ${effectiveDate} | <strong>Document Version:</strong> ${version}</p>`,
+  });
   // Get relevant laws for compliance info
   const relevantLaws = LAW_REGISTRY[config.authority.split(',')[0]] || [];
   

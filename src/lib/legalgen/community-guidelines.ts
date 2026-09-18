@@ -150,7 +150,7 @@ export function generateCommunityGuidelines(data: FormData): GeneratedDocument {
     complianceInfo: {
       laws: relevantLaws,
       lastUpdated: new Date().toISOString(),
-      jurisdiction: 'India',
+      jurisdiction: 'IN',
     },
   };
 }

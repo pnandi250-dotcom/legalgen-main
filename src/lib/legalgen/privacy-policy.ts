@@ -372,7 +372,7 @@ export function generatePrivacyPolicy(data: FormData): GeneratedDocument {
           law.name.includes('Digital Personal Data Protection')
       ),
       lastUpdated: new Date().toISOString(),
-      jurisdiction: 'India',
+      jurisdiction: 'IN',
     },
   };
 }

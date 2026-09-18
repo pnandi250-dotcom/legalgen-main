@@ -1,6 +1,6 @@
 // src/lib/legalgen/privacy-hunter.ts
 // Privacy Policy Hunter - Finds hidden privacy policies on any website
-
+import { safeFetch } from '@/lib/security/url-guard';
 export interface PrivacyPolicyFound {
   url: string;
   confidence: number; // 0-100
@@ -149,7 +149,7 @@ export async function huntPrivacyPolicy(websiteUrl: string): Promise<HunterResul
     const enrichedPolicies = await enrichWithDetails(uniquePolicies);
 
     const summary = generateSummary(enrichedPolicies);
-    const competitorAnalysis = generateCompetitorAnalysis(enrichedolicies, normalizedUrl);
+   const competitorAnalysis = generateCompetitorAnalysis(enrichedPolicies, normalizedUrl);
     const scanTime = Date.now() - startTime;
 
     return {
@@ -221,7 +221,7 @@ async function testUrlPattern(baseUrl: string, pattern: string): Promise<Privacy
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
-    const response = await fetch(url, { 
+    const response = await safeFetch(url, { 
       method: 'HEAD',
       signal: controller.signal,
       headers: {
@@ -233,7 +233,7 @@ async function testUrlPattern(baseUrl: string, pattern: string): Promise<Privacy
     clearTimeout(timeoutId);
     const responseTime = Date.now() - startTest;
     
-    if (response.ok || response.status === 405) {
+    if ((response.status >= 200 && response.status < 300) || response.status === 405) {
       return {
         url,
         confidence: 70,
@@ -257,7 +257,7 @@ async function scrapeHomepageForLinks(baseUrl: string): Promise<PrivacyPolicyFou
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     
-    const response = await fetch(baseUrl, {
+    const response = await safeFetch(baseUrl, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'LegalGen-PrivacyHunter/1.0 (Compliance Scanner)',
@@ -267,9 +267,9 @@ async function scrapeHomepageForLinks(baseUrl: string): Promise<PrivacyPolicyFou
     
     clearTimeout(timeoutId);
     
-    if (!response.ok) return results;
+    if (response.status < 200 || response.status >= 300) return results;
     
-    const html = await response.text();
+    const html = response.body;
     const scrapeTime = Date.now() - startScrape;
     
     const links = extractLinksFromHtml(html, baseUrl);
@@ -340,16 +340,16 @@ async function checkSitemap(baseUrl: string): Promise<PrivacyPolicyFound[]> {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const response = await fetch(sitemapUrl, {
+      const response = await safeFetch(sitemapUrl, {
         signal: controller.signal,
         headers: { 'User-Agent': 'LegalGen-PrivacyHunter/1.0' }
       });
       
       clearTimeout(timeoutId);
       
-      if (!response.ok) continue;
+      if (response.status < 200 || response.status >= 300) continue;
       
-      const xml = await response.text();
+      const xml = response.body;
       
       const urlRegex = /<loc>([^<]*privacy[^<]*)<\/loc>/gi;
       let match;
@@ -380,16 +380,16 @@ async function checkRobotsTxt(baseUrl: string): Promise<PrivacyPolicyFound[]> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
-    const response = await fetch(robotsUrl, {
+    const response = await safeFetch(robotsUrl, {
       signal: controller.signal,
       headers: { 'User-Agent': 'LegalGen-PrivacyHunter/1.0' }
     });
     
     clearTimeout(timeoutId);
     
-    if (!response.ok) return results;
+    if (response.status < 200 || response.status >= 300) return results;
     
-    const text = await response.text();
+    const text = response.body;
     
     const sitemapRegex = /^Sitemap:\s*(.*privacy.*)$/gim;
     let match;
@@ -445,7 +445,7 @@ async function fetchPolicyDetails(url: string): Promise<Partial<PrivacyPolicyFou
   const timeoutId = setTimeout(() => controller.abort(), 8000);
   
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       signal: controller.signal,
       headers: { 'User-Agent': 'LegalGen-PrivacyHunter/1.0' }
     });
@@ -454,9 +454,9 @@ async function fetchPolicyDetails(url: string): Promise<Partial<PrivacyPolicyFou
     
     details.statusCode = response.status;
     
-    if (!response.ok) return details;
+    if (response.status < 200 || response.status >= 300) return details;
     
-    const html = await response.text();
+    const html = response.body;
     
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (titleMatch) {

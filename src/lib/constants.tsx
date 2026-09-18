@@ -8,6 +8,14 @@ import {
 } from "lucide-react";
 import type { DocumentType } from "@/lib/legalgen/types";
 
+
+export const BRAND = {
+    name: process.env.NEXT_PUBLIC_BRAND_NAME ?? 'LegalGen',
+    url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legalgen.in',
+    supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'support@legalgen.in',
+    tagline: 'India-first legal documents and compliance checks',
+} as const;
+
 export const DOC_CONFIGS = [
     { type: "privacy-policy" as DocumentType, title: "Privacy Policy", description: "IT Act 2000, DPDP Act 2023, IT Rules 2021 compliant. Data collection, user rights, data principal requests, and grievance redressal.", icon: <Shield className="w-6 h-6" />, color: "text-emerald-700", bgColor: "bg-emerald-50", borderColor: "border-emerald-200", badge: "Most Popular", category: "Core", laws: ["IT Act 2000", "DPDP Act 2023", "IT Rules 2021"] },
     { type: "terms-of-service" as DocumentType, title: "Terms of Service", description: "User accounts, IP rights, liability limits, termination, governing law, and arbitration under Indian law.", icon: <FileText className="w-6 h-6" />, color: "text-slate-700", bgColor: "bg-slate-50", borderColor: "border-slate-200", badge: "Essential", category: "Core", laws: ["IT Act 2000", "Arbitration Act 1996", "Indian Contract Act"] },

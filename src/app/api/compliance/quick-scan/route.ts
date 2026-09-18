@@ -1,111 +1,71 @@
 /**
- * LegalGen V2 - Quick Scan API
- * 
  * POST /api/compliance/quick-scan
- * 
- * One-step: Scan URL → Analyze → Return results
+ * Scan → applicability → risk, in one call. Anonymous callers allowed with a
+ * tight quota, because this is the top-of-funnel demo.
  */
-
-import { NextRequest, NextResponse } from 'next/server';
+import { route } from '@/lib/api/handler';
+import { quickScanRequest } from '@/lib/validation/schemas';
+import { consumeQuota } from '@/lib/quota';
+import { runScan } from '@/lib/scanner/client';
 import { analyzeApplicability } from '@/lib/legalgen/applicability-engine';
 import { calculateRiskScore } from '@/lib/legalgen/risk-calculator';
 import { convertToBusinessProfile } from '@/lib/legalgen/business-types';
 
-const SCRAPER_URL = process.env.SCRAPER_URL || 'http://localhost:3001';
-const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || 'legalgen-v2-key-2024';
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-export async function POST(request: NextRequest) {
-    try {
-        const { url, companyName } = await request.json();
+export const POST = route(
+    { schema: quickScanRequest, auth: 'anonymous' },
+    async ({ body, user, request, requestId }) => {
+        const quota = await consumeQuota(user, request, 'scan');
+        const scan = await runScan(body.url, { requestId });
 
-        if (!url) {
-            return NextResponse.json({ error: 'URL required' }, { status: 400 });
-        }
-
-        console.log(`🚀 Quick scan starting: ${url}`);
-
-        // Step 1: Scrape website
-        const scrapeResponse = await fetch(`${SCRAPER_URL}/api/scan`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': SCRAPER_API_KEY,
-            },
-            body: JSON.stringify({ url }),
-        });
-
-        if (!scrapeResponse.ok) {
-            throw new Error('Scraper failed');
-        }
-
-        const scrapeData = await scrapeResponse.json();
-        const scanResult = scrapeData.data;
-
-        // Step 2: Convert scraper output to business facts
+        // Map observed signals to business facts. Unlike the old version this
+        // only sets a feature when the scanner reports actual evidence.
         const features: Record<string, boolean> = {};
+        const tech = new Set(scan.technologies.map((t) => t.category.toLowerCase()));
+        if (tech.has('payments')) features.hasPayments = true;
+        if (tech.has('e-commerce')) { features.sellsProducts = true; features.hasPayments = true; }
+        if (tech.has('analytics') || tech.has('marketing')) { features.hasCookies = true; features.hasAnalytics = true; }
+        if (tech.has('marketing')) features.hasAds = true;
+        if (scan.forms.some((f) => f.collectsPersonalData)) features.hasUsers = true;
+        if (scan.businessType.key === 'saas') features.hasAccounts = true;
 
-        // Map scraper findings to features
-        if (scanResult.insights?.likelyEcommerce) {
-            features.sellsProducts = true;
-            features.hasPayments = true;
-        }
-        if (scanResult.forms?.collectsPersonalData) {
-            features.hasUsers = true;
-        }
-        if (scanResult.technologies?.cookies?.length > 0) {
-            features.hasCookies = true;
-        }
-        if (scanResult.technologies?.payments?.length > 0) {
-            features.hasPayments = true;
-        }
-        if (scanResult.businessFacts?.some((f: any) => f.factType === 'runs_ads')) {
-            features.hasAds = true;
-        }
-        if (scanResult.businessFacts?.some((f: any) => f.factType === 'uses_cookies')) {
-            features.hasCookies = true;
-        }
-
-        // Step 3: Create business profile & analyze
-        const businessProfile = convertToBusinessProfile({
-            companyName: companyName || scanResult.url || 'Scanned Business',
-            website: url,
-            businessType: 'web-business',
-            features
+        const profile = convertToBusinessProfile({
+            companyName: body.companyName || scan.title || scan.domain,
+            website: scan.finalUrl,
+            businessType: scan.businessType.key,
+            features,
         });
 
-        const applicability = analyzeApplicability(businessProfile);
+        const applicability = analyzeApplicability(profile);
         const risk = calculateRiskScore(applicability);
 
-        console.log(`✅ Quick scan complete! Risk level: ${risk.level}`);
-
-        return NextResponse.json({
-            success: true,
-            data: {
-                url,
-                scannedAt: scanResult.scannedAt,
-                scanResult,
-                analysis: {
-                    applicability: {
-                        summary: applicability.summary,
-                        applicableObligations: applicability.applicableObligations.length,
-                        needsReview: applicability.needsReviewObligations.length
-                    },
-                    risk: {
-                        score: risk.overallScore,
-                        level: risk.level,
-                        topRisks: risk.topRisks.slice(0, 5),
-                        categories: risk.categories
-                    }
+        return {
+            scan: {
+                domain: scan.domain,
+                businessType: scan.businessType,
+                policies: scan.policies,
+                findings: scan.findings.slice(0, 20),
+                checksPerformed: scan.checksPerformed,
+                checksSkipped: scan.checksSkipped,
+                confidence: scan.score.confidence,
+            },
+            analysis: {
+                summary: applicability.summary,
+                applicableObligations: applicability.applicableObligations.length,
+                needsReview: applicability.needsReviewObligations.length,
+                risk: {
+                    score: risk.overallScore,
+                    level: risk.level,
+                    topRisks: risk.topRisks.slice(0, 5),
                 },
-                recommendations: risk.recommendations.slice(0, 8)
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ Quick scan error:', error);
-        return NextResponse.json(
-            { error: 'Quick scan failed', message: (error as Error).message },
-            { status: 500 }
-        );
-    }
-}
+            },
+            recommendations: risk.recommendations.slice(0, 8),
+            quota: { remaining: quota.remaining, resetsAt: quota.resetsAt },
+            /** Honest framing: signals observed, not a compliance certificate. */
+            disclaimer:
+                'These are signals observed on the public pages we could reach. They are not a legal opinion or a certificate of compliance.',
+        };
+    },
+);
