@@ -4,6 +4,7 @@
 import { POLICY_TAXONOMY, getPolicyConfig, type PolicyConfig } from './taxonomy';
 import { ConfidenceScorer, type ConfidenceFactors, type SignalEvidence, type ScoringResult } from './confidence-scorer';
 import { EvidenceTracker, type DiscoveryMethod, type AuditTrailRecord } from './evidence-tracker';
+import { EvidenceItem } from './confidence-scorer';
 
 export interface PageContent {
   url: string;
@@ -37,7 +38,7 @@ export interface ClassificationResult {
   allCandidates: ClassificationCandidate[];
 
   /** Evidence supporting classification */
-  evidence: SignalEvidence[];
+  evidence: EvidenceItem[];
 
   /** Score breakdown by signal type */
   scoreBreakdown: Record<string, number>;
@@ -126,13 +127,13 @@ export class PolicyClassifier {
 
     // Generate evidence
     const evidence = this.scorer.generateEvidence(factors, {
-      url: page.url,
-      title: page.title,
-      headings: page.headings,
-      content: page.textContent,
-      metaDescription: page.metaDescription,
-      navigationContext: page.navigationContext
-    });
+  url: page.url,
+  title: page.title,
+  headings: page.headings,
+  textContent: page.textContent,
+  metaDescription: page.metaDescription,
+  navigationContext: page.navigationContext
+}, bestMatch.policyType); 
 
     // Record decision in audit trail
     this.tracker.recordDecision(
