@@ -57,7 +57,7 @@ export interface ClassifierOptions {
   maxCandidates?: number;
 
   /** Custom weights for scoring */
-  customWeights?: Partial<Record<keyof ConfidenceFactors, number>> | null;
+  customWeights?: Partial<Record<keyof ConfidenceFactors, number>>;
 
   /** Enable detailed logging */
   debug?: boolean;
@@ -82,7 +82,7 @@ export class PolicyClassifier {
       ...options
     };
 
-    this.scorer = new ConfidenceScorer(this.options.customWeights);
+    this.scorer = new ConfidenceScorer(this.options.customWeights ?? undefined);
     this.tracker = new EvidenceTracker();
   }
 
