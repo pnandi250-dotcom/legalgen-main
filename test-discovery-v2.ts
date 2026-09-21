@@ -78,7 +78,6 @@ async function runAdvancedTest(targetUrl: string) {
         console.log(`      Confidence: ${(classification.confidence * 100).toFixed(1)}% (${classification.level})`);
         console.log(`      Category: ${classification.evidence.length > 0 ? 'Detected' : 'Unknown'}`);
         if (classification.evidence.length > 0) {
-          console.log(`      Evidence: ${classification.evidence[0].description}`);
         }
         console.log('');
       }
