@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import * as https from 'https';
 import { 
   DiscoveredUrl, 
   CrawlOptions, 
@@ -12,12 +13,10 @@ import { RobotsTxtParser } from './robots-parser';
 import { SitemapParser } from './sitemap-parser';
 import { LinkExtractor } from './link-extractor';
 
-import * as https from 'https';
-
-// Add this helper function
-function createUnsafeAgent() {
+// Helper function for legacy SSL support (optional, used if needed)
+function createUnsafeAgent(): https.Agent {
   return new https.Agent({
-    rejectUnauthorized: false, // Only for testing with legacy servers
+    rejectUnauthorized: false,
     secureOptions: require('constants').SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION
   });
 }
@@ -152,8 +151,8 @@ export class PolicyCrawler {
           
           this.results.push(discoveredUrl);
 
-          // Extract links if within depth limit
-          if (current.depth < this.options.maxDepth) {
+          // Extract links if within depth limit AND html exists
+          if (current.depth < this.options.maxDepth && pageContent.html) {
             const links = this.linkExtractor.extract(pageContent.html, current.url);
             
             for (const link of links.internalLinks) {
@@ -219,7 +218,7 @@ export class PolicyCrawler {
 
       // Extract text content
       $('script, style, noscript').remove();
-      const text = $('body').text().replace(/\s+/g, ' ').trim();
+      const textContent = $('body').text().replace(/\s+/g, ' ').trim();
 
       // Extract headings
       const headings: string[] = [];
@@ -247,16 +246,24 @@ export class PolicyCrawler {
       // Extract last modified from meta or header
       const lastModified = metaTags['last-modified'] || response.headers.get('last-modified') || undefined;
 
+      // FIX: Extract links as objects { href, text } to match PageContent interface
+      const links: Array<{ href: string; text: string }> = [];
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        const text = $(el).text().trim();
+        if (href) {
+          links.push({ href, text });
+        }
+      });
+
       return {
         url,
         title,
-        text,
+        textContent,
         html,
         headings,
-        metaTags,
-        links: [], // Links are extracted separately
+        links, // Now correctly typed as { href: string; text: string }[]
         language,
-        lastModified
       };
     } catch (error) {
       throw error;
@@ -301,7 +308,7 @@ export class PolicyCrawler {
         /\/cart/i,
         /\/checkout/i,
         /\/search\?/i,
-        /\/\?/i, // Exclude query parameters unless necessary
+        /\/\?/i,
       ];
 
       for (const pattern of excludePatterns) {
