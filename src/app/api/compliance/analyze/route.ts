@@ -1,45 +1,52 @@
-/**
- * POST /api/compliance/analyze
- * Full analysis from answers or company details. No scanning, no upstream.
- *
- * The unchecked `body.businessProfile as BusinessProfile` cast is gone: input
- * is Zod-parsed and the profile is always built by convertToBusinessProfile.
- */
-import { route } from '@/lib/api/handler';
-import { analyzeRequest } from '@/lib/validation/schemas';
-import { consumeQuota } from '@/lib/quota';
-import {
-    analyzeApplicability,
-    generateCompliancePriority,
-} from '@/lib/legalgen/applicability-engine';
-import {
-    calculateRiskScore,
-    generateExecutiveSummary,
-    estimateComplianceInvestment,
-} from '@/lib/legalgen/risk-calculator';
-import { convertToBusinessProfile } from '@/lib/legalgen/business-types';
+// src/app/api/compliance/analyze/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { PolicyCrawler } from '@/lib/discovery/crawler';
+import { PolicyClassifier } from '@/lib/classifier/policy-classifier';
 
-export const runtime = 'nodejs';
+export async function POST(req: NextRequest) {
+  try {
+    const { url } = await req.json();
 
-export const POST = route({ schema: analyzeRequest, auth: 'anonymous' }, async ({ body, user, request }) => {
-    await consumeQuota(user, request, 'generate');
+    if (!url) {
+      return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+    }
 
-    const profile = convertToBusinessProfile({
-        companyName: body.companyInfo?.name ?? 'Unnamed business',
-        website: body.companyInfo?.website ?? body.url ?? '',
-        businessType: body.companyInfo?.industry ?? 'general',
-        features: body.features ?? {},
+    // 1. Crawl the website
+    const crawler = new PolicyCrawler({
+      maxDepth: 2,
+      maxPages: 15,
+      delayMs: 500,
+      respectRobotsTxt: true
     });
 
-    const applicability = analyzeApplicability(profile);
-    const risk = calculateRiskScore(applicability);
+    const crawlResult = await crawler.crawl(url);
 
-    return {
-        businessProfile: profile,
-        applicability,
-        risk,
-        priority: generateCompliancePriority(applicability),
-        executiveSummary: generateExecutiveSummary(risk, applicability),
-        investmentEstimate: estimateComplianceInvestment(applicability),
-    };
-});
+    // 2. Classify policies (simplified for API response)
+    const classifier = new PolicyClassifier({ minConfidence: 0.4 });
+    const identifiedPolicies: any[] = [];
+
+    // Note: In a real scenario, you would fetch content for each crawled URL here.
+    // For now, we return the crawl structure which the frontend can analyze.
+    
+    return NextResponse.json({
+      success: true,
+      url,
+      crawlResult: {
+        totalPages: crawlResult.totalPages,
+        discoveredUrls: crawlResult.discoveredUrls.map(u => ({
+          url: u.url,
+          source: u.source,
+          depth: u.depth
+        }))
+      },
+      message: `Successfully crawled ${crawlResult.totalPages} pages.`
+    });
+
+  } catch (error) {
+    console.error('Compliance analysis error:', error);
+    return NextResponse.json(
+      { error: 'Failed to analyze website. ' + (error instanceof Error ? error.message : 'Unknown error') },
+      { status: 500 }
+    );
+  }
+}
