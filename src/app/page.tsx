@@ -1187,10 +1187,10 @@ const questions = useMemo(() => {
 
     try {
       // ✅ USE EXTERNAL SCRAPER (Reliable)
-      const res = await fetch('https://legalgen-scraper.onrender.com/api/scan', {
+      const res = await fetch('/api/compliance/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUrl: fixedUrl })
+        body: JSON.stringify({ url: fixedUrl })
       });
 
       if (!res.ok) {
@@ -1294,7 +1294,7 @@ const questions = useMemo(() => {
       fetch('https://legalgen-scraper.onrender.com/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUrl: fixedUrl }),
+        body: JSON.stringify({ url: fixedUrl })
       })
         .then(res => res.json())
         .then(data => {
