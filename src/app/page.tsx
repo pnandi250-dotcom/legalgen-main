@@ -120,13 +120,15 @@ function useTheme() {
 
 /* ─── COMPLIANCE CHECKER TYPES ─── */
 interface ComplianceResult {
-  page: string;
+  type: string;
+  label: string;
   found: boolean;
-  url: string | null;
-  source: string;
-  severity: 'critical' | 'important' | 'recommended';
-  description: string;
-  generateType: string;
+  description?: string;
+  page?: string;
+  url?: string | null;
+  source?: string;
+  severity?: "critical" | "important" | "recommended";
+  generateType?: string;
 }
 
 interface ComplianceResponse {
@@ -167,7 +169,10 @@ function buildComplianceChecks(pageText: string): ComplianceResult[] {
   return Object.entries(COMPLIANCE_KEYWORDS).map(([docType, entry]) => {
     const isCritical = ['privacy-policy', 'terms-of-service', 'cookie-policy'].includes(docType);
     const found = entry.keywords.some((kw) => pageText.toLowerCase().includes(kw));
+    
     return {
+      type: docType,        // ✅ ADDED: Required by interface
+      label: entry.label,   // ✅ ADDED: Required by interface
       page: entry.label,
       found,
       url: found ? 'detected' : null,
@@ -983,6 +988,8 @@ const [copiedHtml, setCopiedHtml] = useState(false);
   const [complianceResult, setComplianceResult] = useState<ComplianceResponse | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [complianceError, setComplianceError] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStartTime, setScanStartTime] = useState<number | null>(null);
 
   // State for tracking if user came from compliance
   const [fromCompliance, setFromCompliance] = useState(false);
@@ -1174,6 +1181,8 @@ const questions = useMemo(() => {
     setIsChecking(true);
     setComplianceError('');
     setComplianceResult(null);
+    setIsScanning(true);
+    setScanStartTime(Date.now());
 
     try {
     const res = await fetch('/api/compliance/analyze', {
@@ -1225,6 +1234,7 @@ const questions = useMemo(() => {
       setComplianceError('Network error. The scraper backend might be asleep or unreachable.');
     }
     setIsChecking(false);
+    
   }, [complianceUrl, user, signInWithGoogle]);
 
   const handleOpenCompliance = useCallback(() => {
@@ -1278,22 +1288,27 @@ const questions = useMemo(() => {
           } else if (data.success && data.text) {
             const pageText = data.text.toLowerCase();
             setDetectedAnalysis(analyzeWebsiteText(pageText));
-            const checkPage = (keywords: string[], pageName: string, generateType: string, severity: string, desc: string) => ({
-              page: pageName,
-              found: keywords.some(kw => pageText.includes(kw)),
-              url: keywords.some(kw => pageText.includes(kw)) ? fixedUrl : null,
-              source: keywords.some(kw => pageText.includes(kw)) ? 'Detected in page structure' : '',
-              severity: severity as 'critical' | 'important' | 'recommended',
-              description: desc,
-              generateType
-            });
+         const checkPage = (keywords: string[], pageName: string, generateType: string, severity: string, desc: string) => {
+  const isFound = keywords.some(kw => pageText.includes(kw));
+  return {
+    type: generateType,       // Added: Required by interface
+    label: pageName,          // Added: Required by interface
+    page: pageName,
+    found: isFound,
+    url: isFound ? fixedUrl : null,
+    source: isFound ? 'Detected in page structure' : '',
+    severity: severity as 'critical' | 'important' | 'recommended',
+    description: desc,
+    generateType
+  };
+};
 
-            const results = [
-              checkPage(['privacy policy', 'privacy notice', 'data protection'], 'Privacy Policy', 'privacy-policy', 'critical', 'Mandatory under DPDP Act 2023 for data collection.'),
-              checkPage(['terms of service', 'terms and conditions', 'terms of use'], 'Terms of Service', 'terms-of-service', 'critical', 'Required to limit business liability and govern usage.'),
-              checkPage(['refund policy', 'cancellation policy', 'return policy'], 'Refund & Cancellation Policy', 'refund-policy', 'important', 'Required by Consumer Protection (E-Commerce) Rules 2020.'),
-              checkPage(['cookie policy', 'manage cookies'], 'Cookie Policy', 'cookie-policy', 'recommended', 'Standard practice for tracking and analytics transparency.')
-            ];
+const results = [
+  checkPage(['privacy policy', 'privacy notice', 'data protection'], 'Privacy Policy', 'privacy-policy', 'critical', 'Mandatory under DPDP Act 2023 for data collection.'),
+  checkPage(['terms of service', 'terms and conditions', 'terms of use'], 'Terms of Service', 'terms-of-service', 'critical', 'Required to limit business liability and govern usage.'),
+  checkPage(['refund policy', 'cancellation policy', 'return policy'], 'Refund & Cancellation Policy', 'refund-policy', 'important', 'Required by Consumer Protection (E-Commerce) Rules 2020.'),
+  checkPage(['cookie policy', 'manage cookies'], 'Cookie Policy', 'cookie-policy', 'recommended', 'Standard practice for tracking and analytics transparency.')
+];
 
             const totalCritical = results.filter(r => r.severity === 'critical').length;
             const foundCritical = results.filter(r => r.found && r.severity === 'critical').length;
@@ -1473,6 +1488,8 @@ const questions = useMemo(() => {
               isChecking={isChecking}
               error={complianceError}
               onCheck={handleCheckCompliance}
+              isScanning={isScanning} 
+              scanStartTime={scanStartTime} 
               onGenerateDoc={handleSelectDoc}
               detectedAnalysis={detectedAnalysis}
             />
@@ -1656,6 +1673,7 @@ doc, copiedHtml, copiedText, onCopyHtml, onCopyText, onDownloadHtml, onDownloadT
   // 👇 ADDED SAVE TO FIRESTORE LOGIC 👇
   const [isSavingDb, setIsSavingDb] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
 
   const handleSaveDocument = async () => {
     if (!user || !doc) return;
@@ -1936,7 +1954,7 @@ PreviewView.displayName = "PreviewView";
    COMPLIANCE CHECKER VIEW (With Live Scanning Timer)
    ═══════════════════════════════════════════ */
 function ComplianceCheckerView({
-  url, setUrl, result, setResult, isChecking, error, onCheck, onGenerateDoc, detectedAnalysis,
+  url, setUrl, result, setResult, isChecking, error, onCheck, isScanning, scanStartTime, onGenerateDoc, detectedAnalysis,
 }: {
   url: string;
   setUrl: (url: string) => void;
@@ -1945,6 +1963,8 @@ function ComplianceCheckerView({
   isChecking: boolean;
   error: string;
   onCheck: () => void;
+  isScanning: boolean; 
+  scanStartTime: number | null;
   onGenerateDoc: (type: DocumentType) => void;
   detectedAnalysis: WebsiteAnalysisResult | null;
 }) {
@@ -2030,316 +2050,152 @@ function ComplianceCheckerView({
         : 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/50'
     : '';
 
-  return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-50/50 dark:bg-slate-950 font-sans">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 mx-auto mb-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center text-[#C2410C] shadow-sm">
-            <Search className="w-7 h-7" />
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
-            Website Compliance Checker
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto text-sm sm:text-base">
-            Enter your website URL below. We will scan it and check which legal pages are missing.
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 block">
-            What type of business is this?
-          </label>
-          <select
-            value={businessType}
-            onChange={(e) => setBusinessType(e.target.value)}
-            className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950 text-sm"
-          >
-            {BUSINESS_TYPES.map((bt) => (
-              <option key={bt.id} value={bt.id}>{bt.label}</option>
-            ))}
-          </select>
-        </div>
-        <Card className="border-slate-200 dark:border-slate-800 shadow-sm mb-8 bg-white dark:bg-slate-900">
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
-                <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  ref={inputRef}
-                  type="url"
-                  placeholder="e.g., https://www.yourwebsite.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="pl-10 rounded-xl h-12 dark:bg-slate-950 dark:border-slate-800"
-                  disabled={isChecking}
-                />
-              </div>
-              <Button
-                onClick={onCheck}
-                disabled={isChecking || !url.trim()}
-                className="bg-[#C2410C] hover:bg-[#9A3412] text-white rounded-xl px-8 h-12 font-semibold uppercase tracking-wider text-xs w-full sm:w-auto transition-colors"
+    return (
+    <div className="w-full max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Input Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700">
+        <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white flex items-center gap-2">
+          <Globe className="w-5 h-5 text-blue-600" />
+          Website Compliance Checker
+        </h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Enter Website URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={url} // ✅ Connected to state
+                onChange={(e) => setUrl(e.target.value)} // ✅ Updates state
+                placeholder="https://example.com"
+                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                disabled={isScanning}
+              />
+              <button
+                onClick={onCheck} // ✅ Triggers scan
+                disabled={!url.trim() || isScanning}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
               >
-                {isChecking ? 'Scanning...' : 'Check'}
-              </Button>
-            </div>
-
-            {error && (
-              <Alert className="mt-4 border-red-200 bg-red-50 dark:bg-red-950/50 dark:border-red-900/50">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-500" />
-                <AlertDescription className="text-red-700 dark:text-red-200 text-sm">{error}</AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-
-        {isChecking && (
-          <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 sm:p-12 mb-8 text-center overflow-hidden relative">
-            {/* Animated Background Progress Bar */}
-            <div
-              className="absolute bottom-0 left-0 h-1 bg-[#C2410C] transition-all duration-1000 ease-linear"
-              style={{ width: `${Math.min((seconds / 50) * 100, 95)}%` }}
-            />
-
-            <div className="flex flex-col items-center justify-center">
-              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 dark:border-slate-700 border-t-[#C2410C] animate-spin mb-6" />
-
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 tracking-tight transition-opacity duration-300">
-                {seconds < 5 && "Analyzing your website..."}
-                {seconds >= 5 && seconds < 15 && "Waking up the scanner..."}
-                {seconds >= 15 && seconds < 35 && "Booting secure backend..."}
-                {seconds >= 35 && "Almost there..."}
-              </h3>
-
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto min-h-[40px]">
-                {seconds < 5 && "Checking your homepage and structure. This usually takes 15-30 seconds."}
-                {seconds >= 5 && seconds < 15 && "Because we use a free-tier server, it sometimes needs a moment to wake from sleep."}
-                {seconds >= 15 && seconds < 35 && `The server is warming up (${seconds}s). Thanks for your patience!`}
-                {seconds >= 35 && `Extracting compliance data (${seconds}s). It can take up to 50 seconds on a cold start.`}
-              </p>
-            </div>
-          </Card>
-        )}
-
-        {result && !isChecking && (
-          <div className="space-y-6">
-            {detectedAnalysis && detectedAnalysis.detections.length > 0 && (
-              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <CardContent className="pt-5 pb-5">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
-                    Detected on your website
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {detectedAnalysis.detections.map((d) => (
-                      <span
-                        key={d.feature}
-                        className="text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                      >
-                        {FEATURE_LABELS[d.feature]}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3">
-                    These were auto-detected from your homepage text and will pre-fill relevant questions when you generate a document.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-            <Card className={cn("border-2", scoreBg)}>              <CardContent className="pt-6 pb-6">
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="text-center">
-                  <div className={cn("text-5xl font-extrabold", scoreColor)}>{result.score}</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium">Compliance Score</div>
-                </div>
-                <div className="flex-1 text-center sm:text-left">
-                  <h3 className="font-semibold text-slate-900 dark:text-white mb-1">
-                    {result.score >= 80
-                      ? 'Great! Mostly Compliant'
-                      : result.score >= 50
-                        ? 'Partially Compliant — Action Needed'
-                        : 'Not Compliant — Immediate Action Required'}
-                  </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {foundPages.length} of {result.results.length} legal pages detected on{' '}
-                    <span className="font-medium text-slate-700 dark:text-slate-300">{result.domain}</span>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-3 gap-3">
-              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{result.foundCritical}</div>
-                  <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Critical ({result.totalCritical})
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{result.foundRecommended}</div>
-                  <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Recommended ({result.totalRecommended})
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">{missingPages.length}</div>
-                  <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    To Generate
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="relative mt-8">
-
-              <div className="space-y-8">
-                {missingPages.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                      <XCircle className="w-5 h-5 text-red-500" />
-                      Missing Pages
-                    </h3>
-                    <div className="space-y-3">
-                      {missingPages.map((page) => (
-                        <Card key={page.page} className="border-red-100 dark:border-red-900/50 bg-white dark:bg-slate-900">
-                          <CardContent className="pt-4 pb-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-semibold text-slate-900 dark:text-white">{page.page}</span>
-                                  <Badge
-                                    variant="secondary"
-                                    className={cn(
-                                      'text-[10px] font-medium px-1.5 py-0.5 border-0',
-                                      page.severity === 'critical'
-                                        ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
-                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
-                                    )}
-                                  >
-                                    {page.severity}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">{page.description}</p>
-
-                                {overridePage === page.page ? (
-                                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <Input
-                                      placeholder="Paste exact URL here..."
-                                      value={overrideUrl}
-                                      onChange={(e) => setOverrideUrl(e.target.value)}
-                                      className="h-8 text-xs sm:max-w-[250px] dark:bg-slate-950"
-                                    />
-                                    <div className="flex gap-2 w-full sm:w-auto">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleOverrideSubmit(page.page, page.severity)}
-                                        className="h-8 flex-1 sm:flex-none bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#C2410C] dark:hover:bg-[#9A3412]"
-                                      >
-                                        Save
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => {
-                                          setOverridePage(null);
-                                          setOverrideUrl('');
-                                        }}
-                                        className="h-8 text-slate-500"
-                                      >
-                                        Cancel
-                                      </Button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => setOverridePage(page.page)}
-                                    className="text-xs font-medium text-[#C2410C] hover:text-[#9A3412] mt-2 inline-flex items-center"
-                                  >
-                                    + I already have this page
-                                  </button>
-                                )}
-                              </div>
-                              {page.generateType && overridePage !== page.page && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => onGenerateDoc(page.generateType as DocumentType)}
-                                  className="bg-[#C2410C] hover:bg-[#9A3412] text-white rounded-lg shrink-0 w-full sm:w-auto mt-3 sm:mt-0"
-                                >
-                                  Generate Now
-                                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
+                {isScanning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    Check
+                  </>
                 )}
-
-                {foundPages.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      Pages Found
-                    </h3>
-                    <div className="space-y-2">
-                      {foundPages.map((page) => (
-                        <div key={page.page} className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-900/50">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                          <div className="flex-1">
-                            <span className="font-medium text-slate-900 dark:text-white text-sm">{page.page}</span>
-                            <p className="text-xs text-slate-400 dark:text-slate-500">{page.source}</p>
-                          </div>
-                          {page.url && (
-                            <a
-                              href={page.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#C2410C] p-2 bg-orange-50 dark:bg-orange-950/30 rounded-md"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <Card className="border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/30 mt-8">
-                <CardContent className="pt-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                    <div className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
-                      <strong>Note:</strong> This checker renders your homepage in a real browser (so JavaScript-loaded content and same-origin iframes are included) and also checks common legal page URLs and footer/nav links directly. It may still miss pages that require a login, use uncommon URL patterns, or are blocked by the site&apos;s bot protection.
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              </button>
             </div>
-          </div>
-        )}
-
-        {!result && !error && !isChecking && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center">
-              <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">Enter a URL to get started</h3>
-            <p className="text-sm text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
               We will check if your website has all the legally required pages for Indian compliance.
             </p>
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Loading State */}
+      {isScanning && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-8 text-center border border-blue-200 dark:border-blue-800">
+          <div className="flex justify-center mb-4">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+          </div>
+          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+            Scanning {new URL(url).hostname}...
+          </h3>
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            Analyzing legal pages, policies, and compliance structure.
+            <br />
+            <span className="opacity-75">This may take up to 30 seconds.</span>
+          </p>
+          <div className="mt-4 h-2 bg-blue-200 dark:bg-blue-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-blue-600 transition-all duration-300"
+              style={{ width: `${Math.min(100, (Date.now() - (scanStartTime || Date.now())) / 300)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !isScanning && (
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 border border-red-200 dark:border-red-800">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-red-900 dark:text-red-100">Scan Failed</h3>
+              <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+              <button
+                onClick={onCheck}
+                className="mt-3 text-sm font-medium text-red-600 hover:text-red-700 underline"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Results State */}
+      {result && !isScanning && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+          {/* Score Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold opacity-90">Compliance Score</h3>
+                <p className="text-sm opacity-75 mt-1">
+                  {result.score >= 80 ? 'Excellent' : result.score >= 50 ? 'Needs Improvement' : 'Critical Issues'}
+                </p>
+              </div>
+              <div className="text-5xl font-bold">{result.score}%</div>
+            </div>
+            <div className="mt-4 h-2 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white transition-all duration-500"
+                style={{ width: `${result.score}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Results List */}
+          <div className="divide-y divide-slate-200 dark:divide-slate-700">
+            {result.results.map((item, idx) => (
+              <div key={idx} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-slate-900 dark:text-white">{item.label}</h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{item.description}</p>
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    item.found 
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                  }`}>
+                    {item.found ? 'Found' : 'Missing'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="p-4 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => {
+                setUrl('');
+                setResult(null);
+              }}
+              className="w-full py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              Scan Another Website
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
