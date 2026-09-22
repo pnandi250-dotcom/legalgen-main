@@ -1161,10 +1161,10 @@ const questions = useMemo(() => {
       return;
     }
     
-    // 🔒 DOMAIN VERIFICATION REQUIRED (NEW!)
+    // 🔒 DOMAIN VERIFICATION REQUIRED
     const domain = extractDomain(complianceUrl);
     if (domain && user.email && !isDomainVerifiedForUser(domain, user.email)) {
-      setComplianceError(`⚠️ Security: You must verify ownership of "${domain}" before running an audit. Domain verification is required to protect website owners.`);
+      setComplianceError(`⚠️ Security: You must verify ownership of "${domain}" before running an audit.`);
       return;
     }
 
@@ -1178,29 +1178,38 @@ const questions = useMemo(() => {
       }
     }
 
+    // Set Loading States
     setIsChecking(true);
-    setComplianceError('');
-    setComplianceResult(null);
     setIsScanning(true);
     setScanStartTime(Date.now());
+    setComplianceError('');
+    setComplianceResult(null);
 
     try {
-    const res = await fetch('/api/compliance/analyze', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ url: fixedUrl })
-});
+      // ✅ USE EXTERNAL SCRAPER (Reliable)
+      const res = await fetch('https://legalgen-scraper.onrender.com/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUrl: fixedUrl })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
+      }
 
       const data = await res.json();
 
       if (data.error) {
-        setComplianceError(data.error);
-      } else if (data.success && data.text) {
+        throw new Error(data.error);
+      }
+
+      if (data.success && data.text) {
         const pageText = data.text.toLowerCase();
 
         const results = buildComplianceChecks(pageText);
         const analysis = analyzeWebsiteText(pageText);
         setDetectedAnalysis(analysis);
+        
         const totalCritical = results.filter(r => r.severity === 'critical').length;
         const foundCritical = results.filter(r => r.found && r.severity === 'critical').length;
         const totalImportant = results.filter(r => r.severity === 'important').length;
@@ -1222,19 +1231,25 @@ const questions = useMemo(() => {
           results
         });
 
-        // 📊 Track audit in Firebase
         trackAudit({
           url: fixedUrl,
           score,
           userId: user?.uid || null,
         });
-
+      } else {
+        throw new Error('Invalid response from scanner');
       }
-    } catch {
+
+    } catch (error) {
+      // ✅ SAFE ERROR HANDLING
+      console.error('Scan failed:', error);
       setComplianceError('Network error. The scraper backend might be asleep or unreachable.');
+    } finally {
+      // ✅ ALWAYS RESET STATES
+      setIsChecking(false);
+      setIsScanning(false);
+      setScanStartTime(null);
     }
-    setIsChecking(false);
-    
   }, [complianceUrl, user, signInWithGoogle]);
 
   const handleOpenCompliance = useCallback(() => {
@@ -2351,6 +2366,7 @@ setJurisdiction?: (j: Jurisdiction) => void;
       await navigator.clipboard.writeText(text);
     } catch (err) {
       console.error('Copy failed:', err);
+      
     }
   }, []);
 
