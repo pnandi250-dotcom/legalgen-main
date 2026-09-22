@@ -1176,11 +1176,11 @@ const questions = useMemo(() => {
     setComplianceResult(null);
 
     try {
-      const res = await fetch('https://legalgen-scraper.onrender.com/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUrl: fixedUrl }),
-      });
+    const res = await fetch('/api/compliance/analyze', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ url: fixedUrl })
+});
 
       const data = await res.json();
 
