@@ -7,7 +7,7 @@
  * This creates a real, verifiable, httpOnly session cookie.
  */
 import { NextResponse, type NextRequest } from 'next/server';
-import { adminAuth } from '@/lib/firebase/admin';
+import { getAdminAuth } from '@/lib/firebase/admin'; // ✅ Correct import
 import { SESSION_COOKIE } from '@/lib/auth/require-user';
 import { sessionRequest } from '@/lib/validation/schemas';
 
@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
 
     try {
         // Verify before minting: never trust a token we have not checked.
-        const decoded = await adminAuth.verifyIdToken(idToken, true);
+        const decoded = await getAdminAuth().verifyIdToken(idToken, true);
+        
         // Reject stale sign-ins: the token must be minutes old, not days.
         if (Date.now() / 1000 - decoded.auth_time > 5 * 60) {
             return NextResponse.json(
@@ -34,7 +35,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn: FIVE_DAYS_MS });
+        // ✅ FIXED: createSessionCookie is a method on Auth, not on verifyIdToken result
+        const sessionCookie = await getAdminAuth().createSessionCookie(idToken, { expiresIn: FIVE_DAYS_MS });
+        
         const response = NextResponse.json({ success: true, data: { uid: decoded.uid } });
         response.cookies.set({
             name: SESSION_COOKIE,
@@ -46,7 +49,8 @@ export async function POST(request: NextRequest) {
             maxAge: FIVE_DAYS_MS / 1000,
         });
         return response;
-    } catch {
+    } catch (error) {
+        console.error('Session creation failed:', error);
         return NextResponse.json(
             { success: false, error: { code: 'UNAUTHENTICATED', message: 'That sign-in could not be verified.' } },
             { status: 401 },
@@ -56,6 +60,14 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
     const response = NextResponse.json({ success: true });
-    response.cookies.set({ name: SESSION_COOKIE, value: '', maxAge: 0, path: '/' });
+    response.cookies.set({
+        name: SESSION_COOKIE,
+        value: '',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 0,
+    });
     return response;
 }

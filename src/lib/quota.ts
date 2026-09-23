@@ -7,7 +7,7 @@
  * across devices. Anonymous callers are limited by hashed IP.
  */
 import { createHash } from 'node:crypto';
-import { adminDb, FieldValue } from '@/lib/firebase/admin';
+import { getAdminDb, FieldValue, Timestamp } from '@/lib/firebase/admin';
 import { ApiError } from '@/lib/api/errors';
 import type { AuthedUser } from '@/lib/auth/require-user';
 
@@ -58,6 +58,7 @@ export async function consumeQuota(
     request: Request,
     action: QuotaAction,
 ): Promise<QuotaResult> {
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
     const { subject, plan } = subjectFor(user, request);
     const limit = DAILY_LIMITS[plan][action];
     const day = utcDay();
@@ -72,9 +73,9 @@ export async function consumeQuota(
         });
     }
 
-    const ref = adminDb.collection('quotas').doc(`${subject}__${action}__${day}`);
+    const ref = db.collection('quotas').doc(`${subject}__${action}__${day}`); // ✅ CHANGED adminDb TO db
 
-    const used = await adminDb.runTransaction(async (tx) => {
+    const used = await db.runTransaction(async (tx) => { // ✅ CHANGED adminDb TO db
         const snap = await tx.get(ref);
         const current = (snap.exists ? (snap.data()?.count as number | undefined) : 0) ?? 0;
         if (current >= limit) return current;
@@ -115,9 +116,10 @@ export async function peekQuota(
     request: Request,
     action: QuotaAction,
 ): Promise<QuotaResult> {
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
     const { subject, plan } = subjectFor(user, request);
     const limit = DAILY_LIMITS[plan][action];
-    const snap = await adminDb.collection('quotas').doc(`${subject}__${action}__${utcDay()}`).get();
+    const snap = await db.collection('quotas').doc(`${subject}__${action}__${utcDay()}`).get(); // ✅ CHANGED adminDb TO db
     const used = (snap.exists ? (snap.data()?.count as number | undefined) : 0) ?? 0;
     return { used, limit, remaining: Math.max(0, limit - used), resetsAt: nextUtcMidnight() };
 }

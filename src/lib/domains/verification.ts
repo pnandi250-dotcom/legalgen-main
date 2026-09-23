@@ -10,7 +10,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { resolveTxt } from 'node:dns/promises';
-import { adminDb, FieldValue } from '@/lib/firebase/admin';
+import { getAdminDb, FieldValue, Timestamp } from '@/lib/firebase/admin';
 import { COLLECTIONS, type VerificationMethod } from '@/lib/data/schema';
 import { safeFetch } from '@/lib/security/url-guard';
 import { ApiError, forbidden, notFound } from '@/lib/api/errors';
@@ -38,10 +38,11 @@ export async function startVerification(
     domainInput: string,
     method: VerificationMethod,
 ): Promise<VerificationInstructions> {
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
     const domain = normaliseDomain(domainInput);
     const token = `${TOKEN_PREFIX}=${randomBytes(24).toString('base64url')}`;
     const expiresAt = new Date(Date.now() + TTL_HOURS * 60 * 60 * 1000);
-    const ref = adminDb.collection(COLLECTIONS.domainVerifications).doc();
+    const ref = db.collection(COLLECTIONS.domainVerifications).doc(); // ✅ CHANGED adminDb TO db
 
     await ref.set({
         id: ref.id,
@@ -86,7 +87,8 @@ export interface VerificationOutcome {
 }
 
 export async function checkVerification(user: AuthedUser, verificationId: string): Promise<VerificationOutcome> {
-    const ref = adminDb.collection(COLLECTIONS.domainVerifications).doc(verificationId);
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
+    const ref = db.collection(COLLECTIONS.domainVerifications).doc(verificationId); // ✅ CHANGED adminDb TO db
     const snap = await ref.get();
     if (!snap.exists) throw notFound('That verification request no longer exists. Start a new one.');
 
@@ -155,9 +157,10 @@ async function proveControl(
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Is this user allowed to audit this domain? Server-side answer to F-06. */
+/** Is this user's domain verified? */
 export async function isDomainVerified(uid: string, domain: string): Promise<boolean> {
-    const snap = await adminDb
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
+    const snap = await db // ✅ CHANGED adminDb TO db
         .collection(COLLECTIONS.domainVerifications)
         .where('uid', '==', uid)
         .where('domain', '==', normaliseDomain(domain))

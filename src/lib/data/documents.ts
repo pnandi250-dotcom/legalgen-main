@@ -4,7 +4,7 @@
  * auto-update impossible (P1-02).
  */
 import { createHash } from 'node:crypto';
-import { adminDb, FieldValue } from '@/lib/firebase/admin';
+import { getAdminDb, FieldValue, Timestamp } from '@/lib/firebase/admin';
 import { COLLECTIONS, INLINE_BODY_LIMIT, type DocumentRecord, type Jurisdiction } from './schema';
 import { forbidden, notFound } from '@/lib/api/errors';
 import type { AuthedUser } from '@/lib/auth/require-user';
@@ -44,10 +44,11 @@ export async function saveDocumentVersion(user: AuthedUser, input: SaveVersionIn
     }
 
     const contentHash = hashBody(input.bodyHtml);
-    const docsRef = adminDb.collection(COLLECTIONS.documents);
-    const versionsRef = adminDb.collection(COLLECTIONS.documentVersions);
+    const db = getAdminDb();
+    const docsRef = db.collection(COLLECTIONS.documents);
+    const versionsRef = db.collection(COLLECTIONS.documentVersions);
 
-    return adminDb.runTransaction(async (tx) => {
+    return db.runTransaction(async (tx) => {
         let documentRef = input.documentId ? docsRef.doc(input.documentId) : docsRef.doc();
         let version = 1;
 
@@ -123,14 +124,15 @@ export async function saveDocumentVersion(user: AuthedUser, input: SaveVersionIn
 }
 
 export async function listDocuments(user: AuthedUser, limit = 25, cursor?: string) {
-    let query = adminDb
+    const db = getAdminDb();
+    let query = db
         .collection(COLLECTIONS.documents)
         .where('ownerUid', '==', user.uid)
         .orderBy('updatedAt', 'desc')
         .limit(Math.min(limit, 100));
 
     if (cursor) {
-        const cursorSnap = await adminDb.collection(COLLECTIONS.documents).doc(cursor).get();
+        const cursorSnap = await db.collection(COLLECTIONS.documents).doc(cursor).get();
         if (cursorSnap.exists) query = query.startAfter(cursorSnap);
     }
 
@@ -153,14 +155,15 @@ export async function listDocuments(user: AuthedUser, limit = 25, cursor?: strin
 }
 
 export async function listVersions(user: AuthedUser, documentId: string) {
-    const docSnap = await adminDb.collection(COLLECTIONS.documents).doc(documentId).get();
+    const db = getAdminDb();
+    const docSnap = await db.collection(COLLECTIONS.documents).doc(documentId).get();
     if (!docSnap.exists) throw notFound('That document no longer exists.');
     const record = docSnap.data() as DocumentRecord;
     if (record.ownerUid !== user.uid && (!user.orgId || record.orgId !== user.orgId)) {
         throw forbidden('That document belongs to another account.');
     }
 
-    const snap = await adminDb
+    const snap = await db
         .collection(COLLECTIONS.documentVersions)
         .where('documentId', '==', documentId)
         .orderBy('version', 'desc')

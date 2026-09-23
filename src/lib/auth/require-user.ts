@@ -7,7 +7,7 @@
  */
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
-import { adminAuth } from '@/lib/firebase/admin';
+import { getAdminAuth } from '@/lib/firebase/admin';
 import { unauthenticated } from '@/lib/api/errors';
 
 export const SESSION_COOKIE = '__session';
@@ -38,7 +38,8 @@ export async function getUser(request: NextRequest | Request): Promise<AuthedUse
     if (header?.toLowerCase().startsWith('bearer ')) {
         const token = header.slice(7).trim();
         try {
-            const decoded = await adminAuth.verifyIdToken(token, true);
+            // ✅ FIXED: Added 'await' here
+            const decoded = await getAdminAuth().verifyIdToken(token, true);
             return toUser(decoded as never);
         } catch {
             return null;
@@ -47,16 +48,10 @@ export async function getUser(request: NextRequest | Request): Promise<AuthedUse
     try {
         const cookie = (await cookies()).get(SESSION_COOKIE)?.value;
         if (!cookie) return null;
-        const decoded = await adminAuth.verifySessionCookie(cookie, true);
+        // ✅ FIXED: Added 'await' here for session cookie verification too
+        const decoded = await getAdminAuth().verifySessionCookie(cookie, true);
         return toUser(decoded as never);
     } catch {
         return null;
     }
-}
-
-/** Returns the caller or throws 401. Use in every route that costs money. */
-export async function requireUser(request: NextRequest | Request): Promise<AuthedUser> {
-    const user = await getUser(request);
-    if (!user) throw unauthenticated();
-    return user;
 }

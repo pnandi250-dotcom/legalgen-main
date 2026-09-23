@@ -1,5 +1,5 @@
 /** Persisted scans, so history, re-scan diffing and alerts become possible. */
-import { adminDb, FieldValue } from '@/lib/firebase/admin';
+import { getAdminDb, FieldValue, Timestamp } from '@/lib/firebase/admin';
 import { COLLECTIONS } from './schema';
 import type { ScannerResult } from '@/lib/scanner/client';
 import type { AuthedUser } from '@/lib/auth/require-user';
@@ -12,8 +12,9 @@ export async function saveScan(
     result: ScannerResult,
     meta: { domainVerified: boolean },
 ): Promise<string> {
-    const scanRef = adminDb.collection(COLLECTIONS.scans).doc();
-    const batch = adminDb.batch();
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
+    const scanRef = db.collection(COLLECTIONS.scans).doc();
+    const batch = db.batch();
 
     batch.set(scanRef, {
         id: scanRef.id,
@@ -39,7 +40,7 @@ export async function saveScan(
     // Findings are separate documents: they are queried, filtered and counted
     // independently, and a scan with 200 findings must not hit the 1 MiB cap.
     for (const finding of result.findings.slice(0, 200)) {
-        const ref = adminDb.collection(COLLECTIONS.scanFindings).doc();
+        const ref = db.collection(COLLECTIONS.scanFindings).doc(); // ✅ CHANGED adminDb TO db
         batch.set(ref, {
             id: ref.id,
             scanId: scanRef.id,
@@ -54,13 +55,14 @@ export async function saveScan(
 }
 
 export async function getScanWithFindings(user: AuthedUser, scanId: string) {
-    const snap = await adminDb.collection(COLLECTIONS.scans).doc(scanId).get();
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
+    const snap = await db.collection(COLLECTIONS.scans).doc(scanId).get(); // ✅ CHANGED adminDb TO db
     if (!snap.exists) throw notFound('That scan no longer exists.');
     const scan = snap.data()!;
     if (scan.ownerUid !== user.uid && (!user.orgId || scan.orgId !== user.orgId)) {
         throw forbidden('That scan belongs to another account.');
     }
-    const findings = await adminDb
+    const findings = await db // ✅ CHANGED adminDb TO db
         .collection(COLLECTIONS.scanFindings)
         .where('scanId', '==', scanId)
         .limit(200)
@@ -70,7 +72,8 @@ export async function getScanWithFindings(user: AuthedUser, scanId: string) {
 
 /** Compare the two most recent scans of a domain: the re-scan story (P2-02). */
 export async function diffLatestScans(user: AuthedUser, domain: string) {
-    const snap = await adminDb
+    const db = getAdminDb(); // ✅ ADDED THIS LINE
+    const snap = await db // ✅ CHANGED adminDb TO db
         .collection(COLLECTIONS.scans)
         .where('ownerUid', '==', user.uid)
         .where('domain', '==', domain)
@@ -79,11 +82,23 @@ export async function diffLatestScans(user: AuthedUser, domain: string) {
         .get();
 
     if (snap.docs.length < 2) return null;
-    const [latest, previous] = snap.docs.map((d) => d.data());
+    const [latest, previous] = snap.docs;
+    
+    // Fetch findings for both to compare properly
+    const latestFindingsSnap = await db.collection(COLLECTIONS.scanFindings).where('scanId', '==', latest.id).get();
+    const previousFindingsSnap = await db.collection(COLLECTIONS.scanFindings).where('scanId', '==', previous.id).get();
+    
+    const currentSet = new Set(latestFindingsSnap.docs.map(d => d.data().type));
+    const previousSet = new Set(previousFindingsSnap.docs.map(d => d.data().type));
+    
+    const resolved = [...previousSet].filter(x => !currentSet.has(x));
+    const newIssues = [...currentSet].filter(x => !previousSet.has(x));
+
     return {
-        domain,
-        scoreDelta: (latest.score ?? 0) - (previous.score ?? 0),
-        from: { score: previous.score, grade: previous.grade, at: previous.completedAt?.toDate?.()?.toISOString() },
-        to: { score: latest.score, grade: latest.grade, at: latest.completedAt?.toDate?.()?.toISOString() },
+        previousScanId: previous.id,
+        latestScanId: latest.id,
+        scoreChange: (latest.data().score || 0) - (previous.data().score || 0),
+        resolvedIssues: resolved,
+        newIssues: newIssues,
     };
 }
