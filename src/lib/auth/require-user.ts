@@ -55,3 +55,13 @@ export async function getUser(request: NextRequest | Request): Promise<AuthedUse
         return null;
     }
 }
+
+/** 
+ * Returns the caller or throws 401. Use in every route that costs money. 
+ * ✅ ADDED THIS FUNCTION TO FIX BUILD ERROR
+ */
+export async function requireUser(request: NextRequest | Request): Promise<AuthedUser> {
+    const user = await getUser(request);
+    if (!user) throw unauthenticated();
+    return user;
+}
