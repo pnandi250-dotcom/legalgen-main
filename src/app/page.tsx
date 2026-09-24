@@ -1260,7 +1260,7 @@ const questions = useMemo(() => {
     setFromCompliance(false);
   }, []);
 
-  const handleRunAuditWithUrl = useCallback((inputUrl: string) => {
+  const handleRunAuditWithUrl = useCallback(async(inputUrl: string) => {
     // 🔒 SECURITY CHECK: Verify domain before running audit
     if (user?.email) {
       const domain = extractDomain(inputUrl);
@@ -1362,7 +1362,7 @@ const results = [
           setIsChecking(false);
         });
     }, 100);
-  }, []);
+  }, [user]);
 
   const currentConfig = DOC_CONFIGS.find(d => d.type === selectedDoc);
 

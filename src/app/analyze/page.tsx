@@ -2,7 +2,7 @@
 
 /**
  * LegalGen V2 - Full Analysis Page
- * 
+ *
  * Comprehensive compliance analysis with detailed results
  */
 
@@ -46,6 +46,13 @@ export default function AnalyzePage() {
             </div>
         );
     }
+
+    return (
+        <AnalyzeContent user={user} />
+    );
+}
+
+function AnalyzeContent({ user }: { user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
     const [step, setStep] = useState<'input' | 'features' | 'results'>('input');
     const [companyName, setCompanyName] = useState('');
     const [website, setWebsite] = useState('');
@@ -73,24 +80,26 @@ export default function AnalyzePage() {
         setLoading(true);
 
         try {
+            // On-site scanner API: SSRF-guarded, authenticated, quota-metered.
+            const idToken = await user?.getIdToken().catch(() => null);
             const response = await fetch('/api/compliance/analyze', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+                },
                 body: JSON.stringify({
-                    companyName,
-                    website,
-                    industry,
-                    features
+                    url: website,
                 })
             });
 
             const data = await response.json();
 
-            if (data.success) {
+            if (response.ok && data.success) {
                 setResults(data.data);
                 setStep('results');
             } else {
-                alert('Analysis failed: ' + data.error);
+                alert('Analysis failed: ' + (typeof data.error === 'string' ? data.error : data.error?.message || 'Unknown error'));
             }
         } catch (error) {
             console.error('Analysis error:', error);
