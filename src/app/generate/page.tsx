@@ -32,6 +32,7 @@ import { generateDmcaPolicy } from "@/lib/legalgen/dmca-policy";
 import { generateContentModerationPolicy } from "@/lib/legalgen/content-moderation-policy";
 import { generateEula } from "@/lib/legalgen/eula";
 import { generateAup } from "@/lib/legalgen/aup";
+import DOMPurify from 'isomorphic-dompurify';
 // Multi-jurisdiction compliance generators
 import { generateMultiJurisdictionPrivacyPolicy } from "@/lib/legalgen/privacy-policy-multi-jurisdiction";
 
@@ -222,7 +223,7 @@ function GeneratePageContent() {
                             <Button onClick={() => { const b = new Blob([generatedHtml], { type: 'text/html' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${selectedDoc}.html`; a.click(); }} variant="outline">Download</Button>
                             <Button onClick={() => { setStep('select'); setSelectedDoc(null); }} className="bg-[#C2410C]">Generate Another</Button>
                         </div>
-                        <Card><CardHeader><CardTitle>Preview - {generatedDoc?.title}</CardTitle></CardHeader><CardContent><div className="bg-slate-50 p-6 max-h-[600px] overflow-auto prose" dangerouslySetInnerHTML={{ __html: generatedHtml }} /></CardContent></Card>
+                        <Card><CardHeader><CardTitle>Preview - {generatedDoc?.title}</CardTitle></CardHeader><CardContent><div className="bg-slate-50 p-6 max-h-[600px] overflow-auto prose" dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize( generatedHtml) }} /></CardContent></Card>
                     </div>
                 )}
             </div>
