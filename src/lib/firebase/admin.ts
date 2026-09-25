@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp, applicationDefault, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { config } from '@/lib/config';
 
 let cachedApp: App | null = null;
 
@@ -13,11 +14,11 @@ function createApp(): App {
         return cachedApp;
     }
 
-    const encoded = process.env.FIREBASE_SERVICE_ACCOUNT;
-    
+    const encoded = config.firebaseServiceAccount;
+
     // During BUILD time (NEXT_PHASE), don't throw errors - just use a dummy config
     // The actual values will be available at RUNTIME on Vercel
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
+    if (config.nextPhase === 'phase-production-build') {
         console.log('⚠️ Skipping Firebase Admin init during build phase');
         cachedApp = initializeApp({ projectId: 'dummy-project-for-build' });
         return cachedApp;
@@ -38,7 +39,7 @@ function createApp(): App {
     }
 
     // Fallback for local dev or Google infra
-    if (process.env.NODE_ENV !== 'production') {
+    if (config.nodeEnv !== 'production') {
         cachedApp = initializeApp({ projectId: 'local-dev-project' });
         return cachedApp;
     }

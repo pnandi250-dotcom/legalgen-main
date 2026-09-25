@@ -14,6 +14,19 @@ import { renderDocument, CLAUSE_LIBRARY_VERSION, GENERATOR_VERSION } from '@/lib
 
 export const runtime = 'nodejs';
 
+// Helper for GET requests using the route wrapper
+function getRoute() {
+  return route(
+    { auth: 'required' },
+    async ({ user, request }) => {
+      const limit = Number(request.nextUrl.searchParams.get('limit') ?? 25);
+      const cursor = request.nextUrl.searchParams.get('cursor') ?? undefined;
+      const data = await listDocuments(user, Number.isFinite(limit) ? limit : 25, cursor);
+      return { data };
+    }
+  );
+}
+
 export const POST = route({ schema: saveDocumentRequest }, async ({ body, user, request }) => {
     await consumeQuota(user, request, 'generate');
 
@@ -40,18 +53,4 @@ export const POST = route({ schema: saveDocumentRequest }, async ({ body, user, 
     return { ...result, title: body.title, clauseLibraryVersion: CLAUSE_LIBRARY_VERSION };
 });
 
-export async function GET(request: NextRequest) {
-    try {
-        const user = await requireUser(request);
-        const limit = Number(request.nextUrl.searchParams.get('limit') ?? 25);
-        const cursor = request.nextUrl.searchParams.get('cursor') ?? undefined;
-        const data = await listDocuments(user, Number.isFinite(limit) ? limit : 25, cursor);
-        return NextResponse.json({ success: true, data });
-    } catch (error) {
-        const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 500;
-        return NextResponse.json(
-            { success: false, error: { code: 'REQUEST_FAILED', message: 'Could not load your documents.' } },
-            { status },
-        );
-    }
-}
+export const GET = getRoute();

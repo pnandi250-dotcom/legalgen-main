@@ -4,6 +4,11 @@ import "./globals.css";
 import { Toaster } from "../components/ui/toaster";
 import { AuthProvider } from "../lib/firebase/AuthContext";
 
+// Server-only startup validation
+if (typeof window === 'undefined') {
+  require('@/lib/startup/validate').validateStartupConfig();
+}
+
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });

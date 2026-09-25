@@ -5,10 +5,8 @@
  * service was open to everyone) by naming one env var on both sides, and
  * removes the copy-pasted fetch in scan/ and quick-scan/.
  */
+import { config } from '@/lib/config';
 import { ApiError } from '@/lib/api/errors';
-
-const SCANNER_URL = process.env.SCANNER_URL;
-const SCANNER_API_KEY = process.env.SCANNER_API_KEY;
 
 export interface ScannerFinding {
     kind: string;
@@ -47,7 +45,9 @@ export interface ScannerResult {
 }
 
 export async function runScan(url: string, opts: { timeoutMs?: number; requestId?: string } = {}): Promise<ScannerResult> {
-    if (!SCANNER_URL || !SCANNER_API_KEY) {
+    const { scannerUrl, scannerApiKey } = config;
+
+    if (!scannerUrl || !scannerApiKey) {
         throw new ApiError('UPSTREAM_UNAVAILABLE', 'Website scanning is temporarily unavailable.');
     }
 
@@ -55,12 +55,12 @@ export async function runScan(url: string, opts: { timeoutMs?: number; requestId
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 25_000);
 
     try {
-        const response = await fetch(new URL('/api/scan', SCANNER_URL), {
+        const response = await fetch(new URL('/api/scan', scannerUrl), {
             method: 'POST',
             signal: controller.signal,
             headers: {
                 'Content-Type': 'application/json',
-                'X-API-Key': SCANNER_API_KEY,
+                'X-API-Key': scannerApiKey,
                 ...(opts.requestId ? { 'X-Request-Id': opts.requestId } : {}),
             },
             body: JSON.stringify({ url }),

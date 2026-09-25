@@ -7,6 +7,7 @@
  * across devices. Anonymous callers are limited by hashed IP.
  */
 import { createHash } from 'node:crypto';
+import { config } from '@/lib/config';
 import { getAdminDb, FieldValue, Timestamp } from '@/lib/firebase/admin';
 import { ApiError } from '@/lib/api/errors';
 import type { AuthedUser } from '@/lib/auth/require-user';
@@ -29,11 +30,11 @@ export interface QuotaResult {
     resetsAt: string;
 }
 
-function utcDay(now = new Date()): string {
+export function utcDay(now = new Date()): string {
     return now.toISOString().slice(0, 10);
 }
 
-function nextUtcMidnight(now = new Date()): string {
+export function nextUtcMidnight(now = new Date()): string {
     const next = new Date(now);
     next.setUTCHours(24, 0, 0, 0);
     return next.toISOString();
@@ -44,7 +45,7 @@ export function subjectFor(user: AuthedUser | null, request: Request): { subject
     if (user) return { subject: `uid:${user.uid}`, plan: user.plan };
     const forwarded = request.headers.get('x-forwarded-for') ?? '';
     const ip = forwarded.split(',')[0].trim() || 'unknown';
-    const salt = process.env.QUOTA_IP_SALT ?? 'legalgen-dev-salt';
+    const salt = config.quotaIpSalt;
     const hashed = createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 32);
     return { subject: `ip:${hashed}`, plan: 'anonymous' };
 }

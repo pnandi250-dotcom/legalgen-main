@@ -19,7 +19,18 @@ const DISCLAIMER_TEXTS = {
     consultLawyer: 'इस दस्तावेज़ को प्रकाशित करने से पहले एक योग्य वकील से परामर्श करें।',
     lastUpdated: `अंतिम अपडेट: ${new Date().toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`,
   },
-  // Add Tamil and Marathi...
+  ta: {
+    title: '⚠️ திருத்தத்திற்கான கற்பনি — சட்ட ஆலோசனை இல்லை',
+    message: 'இந்த ஆவணம் LegalGen AI மூலம் உருவாக்கப்பட்டுள்ளது. இது ஒரு தொடக்க புள்ளியாகித் தான் 있고, வெளியிடுவதற்கு முன் ஒரு தகுதியுடைய சட்ட ஒழுங்குநர் மூலம் மதிப்பீடு செய்யப்பட வேண்டும்.',
+    consultLawyer: 'இந்த ஆவணத்தை வெளியிடுவதற்கு முன் ஒரு தகுதியுடைய வழக்கறிஞர் கலந்து கொள்ளுங்கள்.',
+    lastUpdated: `கடைசியாக புதுப்பிக்கப்பட்டது: ${new Date().toLocaleDateString('ta-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+  },
+  mr: {
+    title: '⚠️ पुनरावलोकनासाठी मसुदा — कायदेशीर सल्ला नाही',
+    message: 'हे दस्तऐवज LegalGen AI द्वारे तयार केलेले आहे. हे फक्त सुरुवातीची बिंदू आहे आणि प्रसिद्धीपूर्वी एक पात्र कायदेशीर व्यावसायिक द्वारे पुनरावलोकन केले पाहिजे.',
+    consultLawyer: 'हे दस्तऐवज प्रसिद्ध करण्यापूर्वी एक पात्र वकीलाशी परामर्श घ्या.',
+    lastUpdated: `शेवटचा अद्ययावत: ${new Date().toLocaleDateString('mr-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+  },
 };
 
 export function LegalDisclaimer({ locale = 'en' }: LegalDisclaimerProps) {
