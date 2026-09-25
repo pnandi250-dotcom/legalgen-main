@@ -1250,7 +1250,12 @@ const questions = useMemo(() => {
     } catch (error) {
       // ✅ SAFE ERROR HANDLING
       console.error('Scan failed:', error);
-      setComplianceError('Something went wrong while scanning that site. Please try again');
+      const message =
+  error instanceof Error && error.message
+    ? error.message
+    : 'Something went wrong while scanning that site. Please try again.';
+setComplianceError(message);
+
     } finally {
       // ✅ ALWAYS RESET STATES
       setIsChecking(false);
