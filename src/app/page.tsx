@@ -1187,21 +1187,27 @@ const questions = useMemo(() => {
     setComplianceResult(null);
 
     try {
-      // ✅ USE EXTERNAL SCRAPER (Reliable)
+            // On-site scanner API: SSRF-guarded, authenticated, quota-metered.
+      const idToken = await user?.getIdToken().catch(() => null);
       const res = await fetch('/api/compliance/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
         body: JSON.stringify({ url: fixedUrl })
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`);
+        const message =
+          data?.error?.message || data?.error || `Server responded with ${res.status}`;
+        throw new Error(message);
       }
 
-      const data = await res.json();
-
-      if (data.error) {
-        throw new Error(data.error);
+      if (data?.error) {
+        throw new Error(typeof data.error === 'string' ? data.error : data.error.message);
       }
 
       if (data.success && data.text) {
@@ -1244,7 +1250,7 @@ const questions = useMemo(() => {
     } catch (error) {
       // ✅ SAFE ERROR HANDLING
       console.error('Scan failed:', error);
-      setComplianceError('Network error. The scraper backend might be asleep or unreachable.');
+      setComplianceError('Something went wrong while scanning that site. Please try again');
     } finally {
       // ✅ ALWAYS RESET STATES
       setIsChecking(false);
