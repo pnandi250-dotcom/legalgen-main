@@ -7,6 +7,7 @@ import { saveDocumentToDb } from "@/lib/firebase/firestore";
 import { trackGeneration, trackAudit } from "@/lib/firebase/analytics";
 import { useAuth } from "@/lib/firebase/AuthContext";
 import { JurisdictionSelector } from '@/components/ui/JurisdictionSelector';
+import DOMPurify from 'isomorphic-dompurify';
 import {
   Shield, FileText, RefreshCcw, Cookie, AlertTriangle,
   Truck, ArrowRight, ArrowLeft, Copy, Check, Download,
@@ -1779,7 +1780,7 @@ doc, copiedHtml, copiedText, onCopyHtml, onCopyText, onDownloadHtml, onDownloadT
               <div className="bg-white dark:bg-slate-900 max-h-[70vh] overflow-y-auto">
                 {tab === "preview" ? (
 <>
-  <div id="pdf-content" style={{ display: 'none' }} dangerouslySetInnerHTML={{ __html: doc.html }} />
+  <div id="pdf-content" style={{ display: 'none' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(doc.html) }} />
   <iframe
     srcDoc={doc.html.replace('<head>', '<head><base target="_blank" rel="noopener noreferrer">')}
     title={doc.title}
