@@ -1,20 +1,10 @@
 /**
- * Application startup validation.
- * Runs once on server startup to validate configuration.
+ * Startup configuration validation utilities.
+ * Called from instrumentation.ts on server startup.
  */
 
-let validated = false;
-
 export function validateStartupConfig(): void {
-  if (validated) return;
-  validated = true;
-
-  // Skip during build phase (static generation)
-  if (process.env.NEXT_PHASE === 'phase-production-build') {
-    console.log('[startup] Skipping config validation during build phase');
-    return;
-  }
-
+  // Dynamic import to avoid issues with ES modules
   const { config, validateConfigForProduction } = require('@/lib/config');
   const cfg = config;
 
@@ -36,9 +26,4 @@ export function validateStartupConfig(): void {
   }
 
   console.log('[startup] Configuration validation complete');
-}
-
-// Auto-run on import in server runtime (not during build)
-if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
-  validateStartupConfig();
 }
