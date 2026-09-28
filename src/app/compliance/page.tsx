@@ -78,7 +78,7 @@ export default function CompliancePage() {
             setResult({ domain: data.domain || new URL(urlToCheck).hostname, url: urlToCheck, score, results, businessType: data.businessType || 'General' });
 
             // ✅ FIXED: Pass object to trackAudit
-            try { await trackAudit({ url: urlToCheck, score, userId: user.uid }); } catch { }
+            try { await trackAudit({ url: urlToCheck, score, userId: user.uid }); } catch { /* ignore audit errors */ }
         } catch { setError('Failed to analyze website'); }
         finally { setIsLoading(false); }
     }, [url, user, signInWithGoogle]);

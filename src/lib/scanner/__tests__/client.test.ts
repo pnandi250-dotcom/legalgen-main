@@ -120,7 +120,8 @@ describe('Scanner Client', () => {
     }
   });
 
-  it('handles 5xx errors from scanner', async () => {
+  it('retries on 5xx errors and eventually throws UPSTREAM_UNAVAILABLE', async () => {
+    // Always return 500
     const mockResponse = {
       ok: false,
       status: 500,
@@ -134,11 +135,13 @@ describe('Scanner Client', () => {
 
     const { runScan } = await import('../client');
     try {
-      await runScan('https://example.com');
+      await runScan('https://example.com', { retries: 1 }); // Only 1 retry for faster test
       throw new Error('Should have thrown');
     } catch (error) {
       expect(isApiError(error)).toBe(true);
       expect((error as any).code).toBe('UPSTREAM_UNAVAILABLE');
+      // Should have retried once (2 total calls)
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     }
   });
 
@@ -147,7 +150,7 @@ describe('Scanner Client', () => {
 
     const { runScan } = await import('../client');
     try {
-      await runScan('https://example.com');
+      await runScan('https://example.com', { retries: 1 });
       throw new Error('Should have thrown');
     } catch (error) {
       expect(isApiError(error)).toBe(true);
@@ -155,19 +158,20 @@ describe('Scanner Client', () => {
     }
   });
 
-  it('handles timeout', async () => {
+  it('handles timeout with retries', async () => {
     (global.fetch as any).mockImplementation(
       () => new Promise((_, reject) => setTimeout(() => reject(new Error('Aborted')), 100))
     );
 
     const { runScan } = await import('../client');
     try {
-      await runScan('https://example.com', { timeoutMs: 50 });
+      await runScan('https://example.com', { timeoutMs: 50, retries: 1 });
       throw new Error('Should have thrown');
     } catch (error) {
       expect(isApiError(error)).toBe(true);
       expect((error as any).code).toBe('UPSTREAM_UNAVAILABLE');
-      expect((error as any).message).toBe('That site took too long to respond.');
+      // Should include retry message
+      expect((error as any).message).toContain('retries');
     }
   });
 
@@ -181,11 +185,35 @@ describe('Scanner Client', () => {
 
     const { runScan } = await import('../client');
     try {
-      await runScan('https://example.com');
+      await runScan('https://example.com', { retries: 1 });
       throw new Error('Should have thrown');
     } catch (error) {
       expect(isApiError(error)).toBe(true);
       expect((error as any).code).toBe('UPSTREAM_UNAVAILABLE');
+    }
+  });
+
+  it('does not retry on 4xx errors', async () => {
+    const mockResponse = {
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: { code: 'BLOCKED_HOST', message: 'That host cannot be scanned' },
+      }),
+    };
+
+    (global.fetch as any).mockResolvedValue(mockResponse);
+
+    const { runScan } = await import('../client');
+    try {
+      await runScan('https://internal.example.com', { retries: 3 });
+      throw new Error('Should have thrown');
+    } catch (error) {
+      expect(isApiError(error)).toBe(true);
+      expect((error as any).code).toBe('BAD_REQUEST');
+      // Should NOT retry on 4xx
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     }
   });
 });

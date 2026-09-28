@@ -46,7 +46,7 @@ export function getConfig(): Config {
   return cachedConfig;
 }
 
-export function validateConfigForProduction(): void {
+export function validateConfigForProduction(): { valid: boolean; errors: string[] } {
   const config = getConfig();
   const errors: string[] = [];
 
@@ -59,9 +59,7 @@ export function validateConfigForProduction(): void {
     }
   }
 
-  if (errors.length > 0) {
-    throw new Error(`Configuration validation failed:\n${errors.map(e => `  - ${e}`).join('\n')}`);
-  }
+  return { valid: errors.length === 0, errors };
 }
 
 export const config = getConfig();

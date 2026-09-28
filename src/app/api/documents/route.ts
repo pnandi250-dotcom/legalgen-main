@@ -4,11 +4,9 @@
  *
  * Replaces the client writing straight to Firestore with only rendered HTML.
  */
-import { NextResponse, type NextRequest } from 'next/server';
 import { route } from '@/lib/api/handler';
 import { saveDocumentRequest } from '@/lib/validation/schemas';
 import { consumeQuota } from '@/lib/quota';
-import { requireUser } from '@/lib/auth/require-user';
 import { listDocuments, saveDocumentVersion } from '@/lib/data/documents';
 import { renderDocument, CLAUSE_LIBRARY_VERSION, GENERATOR_VERSION } from '@/lib/clause-library/render';
 

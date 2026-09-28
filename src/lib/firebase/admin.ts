@@ -34,7 +34,7 @@ function createApp(): App {
             return cachedApp;
         } catch (e) {
             console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT:', e);
-            throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT format');
+            throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT format', { cause: e });
         }
     }
 

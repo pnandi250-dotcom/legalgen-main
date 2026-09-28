@@ -132,7 +132,7 @@ function GeneratePageContent() {
             try {
                 await saveDocumentToDb(user.uid, result.title, result.html);
                 await trackGeneration({ docType: selectedDoc, docTitle: result.title, userId: user.uid, userEmail: user.email });
-            } catch { }
+            } catch { /* ignore save/track errors */ }
         } finally { setIsGenerating(false); }
     }, [selectedDoc, formData, user]);
 

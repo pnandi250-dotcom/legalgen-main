@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('Configuration Validation', () => {
   const originalEnv = { ...process.env };
@@ -60,7 +60,7 @@ describe('Configuration Validation', () => {
   });
 
   describe('validateConfigForProduction', () => {
-    it('throws when SCANNER_URL missing in production', async () => {
+    it('returns errors when SCANNER_URL missing in production', async () => {
       process.env.NODE_ENV = 'production';
       process.env.SCANNER_API_KEY = 'test-key';
       process.env.FIREBASE_SERVICE_ACCOUNT = 'eyJ0eXBlIjoic2VydmljZV9hY2NvdW50In0=';
@@ -68,10 +68,13 @@ describe('Configuration Validation', () => {
       delete process.env.SCANNER_URL;
 
       const { validateConfigForProduction } = await import('../config');
-      expect(() => validateConfigForProduction()).toThrow('SCANNER_URL is required in production');
+      const result = validateConfigForProduction();
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('SCANNER_URL is required in production');
     });
 
-    it('throws when SCANNER_API_KEY missing in production', async () => {
+    it('returns errors when SCANNER_API_KEY missing in production', async () => {
       process.env.NODE_ENV = 'production';
       process.env.SCANNER_URL = 'https://scanner.example.com';
       process.env.FIREBASE_SERVICE_ACCOUNT = 'eyJ0eXBlIjoic2VydmljZV9hY2NvdW50In0=';
@@ -79,10 +82,13 @@ describe('Configuration Validation', () => {
       delete process.env.SCANNER_API_KEY;
 
       const { validateConfigForProduction } = await import('../config');
-      expect(() => validateConfigForProduction()).toThrow('SCANNER_API_KEY is required in production');
+      const result = validateConfigForProduction();
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('SCANNER_API_KEY is required in production');
     });
 
-    it('throws when FIREBASE_SERVICE_ACCOUNT missing in production', async () => {
+    it('returns errors when FIREBASE_SERVICE_ACCOUNT missing in production', async () => {
       process.env.NODE_ENV = 'production';
       process.env.SCANNER_URL = 'https://scanner.example.com';
       process.env.SCANNER_API_KEY = 'test-key';
@@ -90,10 +96,13 @@ describe('Configuration Validation', () => {
       delete process.env.FIREBASE_SERVICE_ACCOUNT;
 
       const { validateConfigForProduction } = await import('../config');
-      expect(() => validateConfigForProduction()).toThrow('FIREBASE_SERVICE_ACCOUNT is required in production');
+      const result = validateConfigForProduction();
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('FIREBASE_SERVICE_ACCOUNT is required in production');
     });
 
-    it('throws when QUOTA_IP_SALT is default in production', async () => {
+    it('returns errors when QUOTA_IP_SALT is default in production', async () => {
       process.env.NODE_ENV = 'production';
       process.env.SCANNER_URL = 'https://scanner.example.com';
       process.env.SCANNER_API_KEY = 'test-key';
@@ -101,10 +110,13 @@ describe('Configuration Validation', () => {
       process.env.QUOTA_IP_SALT = 'legalgen-dev-salt-change-in-production';
 
       const { validateConfigForProduction } = await import('../config');
-      expect(() => validateConfigForProduction()).toThrow('QUOTA_IP_SALT must be changed from default in production');
+      const result = validateConfigForProduction();
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('QUOTA_IP_SALT must be changed from default in production');
     });
 
-    it('passes when all production vars are set correctly', async () => {
+    it('returns valid when all production vars are set correctly', async () => {
       process.env.NODE_ENV = 'production';
       process.env.SCANNER_URL = 'https://scanner.example.com';
       process.env.SCANNER_API_KEY = 'test-key';
@@ -112,10 +124,13 @@ describe('Configuration Validation', () => {
       process.env.QUOTA_IP_SALT = 'custom-production-salt';
 
       const { validateConfigForProduction } = await import('../config');
-      expect(() => validateConfigForProduction()).not.toThrow();
+      const result = validateConfigForProduction();
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
-    it('does not validate in non-production env', async () => {
+    it('returns valid in non-production env even with missing vars', async () => {
       process.env.NODE_ENV = 'development';
       delete process.env.SCANNER_URL;
       delete process.env.SCANNER_API_KEY;
@@ -123,7 +138,10 @@ describe('Configuration Validation', () => {
       delete process.env.QUOTA_IP_SALT;
 
       const { validateConfigForProduction } = await import('../config');
-      expect(() => validateConfigForProduction()).not.toThrow();
+      const result = validateConfigForProduction();
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
   });
 });

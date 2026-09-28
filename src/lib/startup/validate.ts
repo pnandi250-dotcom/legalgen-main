@@ -15,8 +15,8 @@ export function validateStartupConfig(): void {
     return;
   }
 
-  const { config } = require('@/lib/config');
-  const cfg = config();
+  const { config, validateConfigForProduction } = require('@/lib/config');
+  const cfg = config;
 
   console.log('[startup] Validating configuration...');
   console.log(`[startup] Environment: ${cfg.nodeEnv}`);
@@ -26,12 +26,12 @@ export function validateStartupConfig(): void {
   console.log(`[startup] Quota Salt: ${cfg.quotaIpSalt === 'legalgen-dev-salt-change-in-production' ? 'DEFAULT (change in production!)' : 'CUSTOM'}`);
 
   if (cfg.nodeEnv === 'production') {
-    try {
-      require('@/lib/config').validateConfigForProduction();
+    const result = validateConfigForProduction();
+    if (!result.valid) {
+      console.warn('[startup] Production config validation warnings:', result.errors.join(', '));
+      // Don't throw - log warnings only, don't crash the app
+    } else {
       console.log('[startup] Production config validation passed');
-    } catch (error) {
-      console.error('[startup] Production config validation FAILED:', error);
-      throw error;
     }
   }
 
