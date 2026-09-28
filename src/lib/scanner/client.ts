@@ -53,9 +53,11 @@ interface ScanOptions {
     retries?: number;
 }
 
-const DEFAULT_TIMEOUT_MS = 60_000; // 60s for cold starts
+// Vercel's maxDuration for analyze route is 60s.
+// Use ~18s per attempt so 3 attempts + backoff fit under 60s.
+const DEFAULT_TIMEOUT_MS = 18_000; // 18s per attempt
 const MAX_RETRIES = 2;
-const RETRY_DELAY_BASE_MS = 2000;
+const RETRY_DELAY_BASE_MS = 1500;
 
 /**
  * Sleep utility for retry delays
