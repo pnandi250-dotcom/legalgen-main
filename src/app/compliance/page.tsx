@@ -17,43 +17,6 @@ interface ComplianceResult {
     severity: 'critical' | 'important'; description: string; generateType: string;
 }
 
-const COMPLIANCE_KEYWORDS = {
-    'privacy-policy': { label: 'Privacy Policy', keywords: ['privacy policy', 'data protection'], description: 'Mandatory under DPDP Act 2023' },
-    'terms-of-service': { label: 'Terms of Service', keywords: ['terms of service', 'terms and conditions'], description: 'Required to limit liability' },
-    'refund-policy': { label: 'Refund Policy', keywords: ['refund policy'], description: 'Consumer Protection Act 2019' },
-    'cancellation-policy': { label: 'Cancellation Policy', keywords: ['cancellation policy'], description: 'For bookings & subscriptions' },
-    'return-policy': { label: 'Return Policy', keywords: ['return policy'], description: 'For physical goods retailers' },
-    'cookie-policy': { label: 'Cookie Policy', keywords: ['cookie policy'], description: 'Tracking transparency' },
-    'shipping-policy': { label: 'Shipping Policy', keywords: ['shipping policy'], description: 'For e-commerce sites' },
-    'disclaimer': { label: 'Disclaimer', keywords: ['disclaimer'], description: 'Limit content liability' },
-    'service-level-agreement': { label: 'SLA', keywords: ['service level agreement'], description: 'For SaaS providers' },
-    'end-user-license-agreement': { label: 'EULA', keywords: ['eula', 'license'], description: 'For software products' },
-    'acceptable-use-policy': { label: 'AUP', keywords: ['acceptable use'], description: 'Platform rules' },
-    'community-guidelines': { label: 'Community Guidelines', keywords: ['community guidelines'], description: 'User interaction rules' },
-    'dmca-policy': { label: 'DMCA Policy', keywords: ['dmca', 'copyright'], description: 'Copyright infringement' },
-    'content-moderation-policy': { label: 'Content Moderation', keywords: ['content moderation'], description: 'IT Rules 2021' },
-    'gdpr-compliance': { label: 'GDPR Compliance', keywords: ['gdpr'], description: 'For EU users' },
-};
-
-function buildChecks(text: string): ComplianceResult[] {
-    return Object.entries(COMPLIANCE_KEYWORDS).map(([type, entry]) => ({
-        page: entry.label,
-        found: entry.keywords.some(kw => text.toLowerCase().includes(kw)),
-        url: null,
-        source: '',
-        severity: ['privacy-policy', 'terms-of-service', 'cookie-policy'].includes(type) ? 'critical' : 'important',
-        description: entry.description,
-        generateType: type,
-    }));
-}
-
-function calcScore(results: ComplianceResult[]): number {
-    if (!results.length) return 0;
-    const score = results.reduce((acc, r) => acc + (r.found ? (r.severity === 'critical' ? 30 : 15) : 0), 0);
-    const max = results.reduce((acc, r) => acc + (r.severity === 'critical' ? 30 : 15), 0);
-    return Math.round((score / max) * 100);
-}
-
 export default function CompliancePage() {
     const { user, signInWithGoogle } = useAuth();
     const [url, setUrl] = useState('');
@@ -70,14 +33,27 @@ export default function CompliancePage() {
 
         setIsLoading(true); setError(null);
         try {
-            const res = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: urlToCheck }) });
+            const res = await fetch('/api/compliance/quick-scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: urlToCheck }) });
             const data = await res.json();
-            const text = data.content || data.text || '';
-            const results = buildChecks(text);
-            const score = calcScore(results);
-            setResult({ domain: data.domain || new URL(urlToCheck).hostname, url: urlToCheck, score, results, businessType: data.businessType || 'General' });
+            if (!res.ok) throw new Error(data.error?.message || 'Scan failed');
+            
+            const results: Array<{ page: string; found: boolean }> = data.analysis?.summary 
+                ? Object.entries(data.analysis.summary).map(([k, v]) => ({ page: k, found: (v as number) > 0 }))
+                : data.scan?.policies?.map((p: { expected: string; found: boolean; substantive: boolean }) => ({ page: p.expected, found: p.found && p.substantive })) || [];
+            
+            const formattedResults = results.map((r: { page: string; found: boolean }) => ({
+                page: r.page,
+                found: r.found,
+                url: null,
+                source: '',
+                severity: ['Privacy Policy', 'Terms of Service', 'Cookie Policy'].includes(r.page) ? 'critical' as const : 'important' as const,
+                description: 'Required for compliance',
+                generateType: r.page.toLowerCase().replace(/\s+/g, '-'),
+            }));
+            
+            const score = data.analysis?.risk?.score || data.scan?.score?.value || 0;
+            setResult({ domain: data.scan?.domain || new URL(urlToCheck).hostname, url: urlToCheck, score, results: formattedResults, businessType: data.scan?.businessType?.name || 'General' });
 
-            // ✅ FIXED: Pass object to trackAudit
             try { await trackAudit({ url: urlToCheck, score, userId: user.uid }); } catch { /* ignore audit errors */ }
         } catch { setError('Failed to analyze website'); }
         finally { setIsLoading(false); }

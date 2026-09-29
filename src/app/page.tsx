@@ -1210,8 +1210,32 @@ const questions = useMemo(() => {
         throw new Error(typeof data.error === 'string' ? data.error : data.error.message);
       }
 
-      if (data.success && data.text) {
-        const pageText = data.text.toLowerCase();
+      // Response is double-wrapped by route handler: data.data.data has the scan results
+      const payload = data.data?.data;
+      if (data.success && payload && Array.isArray(payload.results)) {
+        const results = payload.results as ComplianceResult[];
+
+        const totalCritical = results.filter((r: ComplianceResult) => r.severity === 'critical').length;
+        const foundCritical = results.filter((r: ComplianceResult) => r.found && r.severity === 'critical').length;
+        const totalImportant = results.filter((r: ComplianceResult) => r.severity === 'important').length;
+        const foundImportant = results.filter((r: ComplianceResult) => r.found && r.severity === 'important').length;
+
+        setDetectedAnalysis(null);
+
+        setComplianceResult({
+          domain: payload.scanner?.domain ?? new URL(fixedUrl).hostname,
+          url: payload.url ?? fixedUrl,
+          score: payload.score,
+          totalCritical, foundCritical,
+          totalImportant, foundImportant,
+          totalRecommended: 0, foundRecommended: 0,
+          results,
+        });
+
+        trackAudit({ url: fixedUrl, score: payload.score, userId: user?.uid || null });
+      } else if (data.success && data.data?.text) {
+        // Fallback: old text-based analysis (data.data.text from inner response)
+        const pageText = data.data.text.toLowerCase();
 
         const results = buildComplianceChecks(pageText);
         const analysis = analyzeWebsiteText(pageText);
@@ -1337,10 +1361,10 @@ const results = [
   checkPage(['cookie policy', 'manage cookies'], 'Cookie Policy', 'cookie-policy', 'recommended', 'Standard practice for tracking and analytics transparency.')
 ];
 
-            const totalCritical = results.filter(r => r.severity === 'critical').length;
-            const foundCritical = results.filter(r => r.found && r.severity === 'critical').length;
-            const totalImportant = results.filter(r => r.severity === 'important').length;
-            const foundImportant = results.filter(r => r.found && r.severity === 'important').length;
+const totalCritical = results.filter((r: ComplianceResult) => r.severity === 'critical').length;
+        const foundCritical = results.filter((r: ComplianceResult) => r.found && r.severity === 'critical').length;
+        const totalImportant = results.filter((r: ComplianceResult) => r.severity === 'important').length;
+        const foundImportant = results.filter((r: ComplianceResult) => r.found && r.severity === 'important').length;
             const totalRecommended = results.filter(r => r.severity === 'recommended').length;
             const foundRecommended = results.filter(r => r.found && r.severity === 'recommended').length;
 

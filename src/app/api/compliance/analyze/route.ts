@@ -50,11 +50,13 @@ export const POST = route(
       generateType: p.expected.toLowerCase().replace(/\s+/g, '-'),
     }));
 
-    log('analyze_done', { domain: scan.domain, score, findings: findings.length });
+log('analyze_done', { domain: scan.domain, score, findings: findings.length });
 
+    // Return in format expected by page.tsx: include text field for backward compat
+    // and structured results in data.data
     return {
       success: true,
-      text: '', // Scanner doesn't return full text
+      text: '', // Empty for backward compat with old page.tsx check
       data: {
         url: scan.finalUrl,
         businessType: businessType.name,
@@ -62,7 +64,6 @@ export const POST = route(
         foundPages,
         missingPages,
         results: complianceResults,
-        // Additional scanner data
         scanner: {
           domain: scan.domain,
           title: scan.title,
@@ -73,8 +74,8 @@ export const POST = route(
           checksSkipped: scan.checksSkipped,
           confidence: scan.score.confidence,
         },
+        disclaimer: 'Analysis performed by automated scanner. Not a legal opinion or compliance certificate.',
       },
-      disclaimer: 'Analysis performed by automated scanner. Not a legal opinion or compliance certificate.',
     };
   }
 );
